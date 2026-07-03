@@ -1,0 +1,113 @@
+services:
+  app:
+    build:
+      context: ./docker/php
+    container_name: laravel_app
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: unless-stopped
+    working_dir: /var/www
+    expose:
+      - "9000"
+    volumes:
+      - ./src:/var/www
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - laravel
+
+  nginx:
+    image: nginx:alpine
+    container_name: laravel_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - laravel
+
+  db:
+    image: mysql:8.4.10
+    container_name: laravel_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-laravel}
+      MYSQL_USER: ${DB_USERNAME:-laravel}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-laravel}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      retries: 20
+      timeout: 3s
+      interval: 5s
+    networks:
+      - laravel
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.3-apache
+    container_name: laravel_phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 0
+      UPLOAD_LIMIT: 128M
+    ports:
+      - "8081:80"
+    networks:
+      - laravel
+
+  vite:
+    build:
+      context: ./docker/node
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: pqrs-mw-vite
+    container_name: laravel_vite
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./src:/var/www
+      - node_modules:/var/www/node_modules
+      - pnpm_store:/home/node/.pnpm-store
+    ports:
+      - "5173:5173"
+    environment:
+      HOME: "/home/node"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      VITE_HMR_HOST: "localhost"
+      PNPM_STORE_DIR: "/home/node/.pnpm-store"
+    command: >
+      sh -lc "
+      echo 'Iniciando Vite con pnpm...' &&
+      pnpm --version &&
+      test -f package.json || (echo 'ERROR: No existe package.json en /var/www. Revisa que ./src tenga el proyecto Laravel/Vite.' && ls -la /var/www && exit 1) &&
+      pnpm config set store-dir /home/node/.pnpm-store &&
+      pnpm install &&
+      pnpm run dev -- --host 0.0.0.0 --port 5173
+      "
+    tty: true
+    stdin_open: true
+    networks:
+      - laravel
+
+networks:
+  laravel:
+
+volumes:
+  db_data:
+  node_modules:
+  pnpm_store:

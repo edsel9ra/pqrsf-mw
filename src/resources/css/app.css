@@ -1,0 +1,86 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --animate-fade-in: fade-in 0.7s ease-out;
+    --animate-slide-up: slide-up 0.7s ease-out;
+    --animate-slide-up-sm: slide-up 0.5s ease-out;
+    --animate-scale-in: scale-in 0.3s ease-out;
+    --animate-star-pop: star-pop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --animate-spin-slow: spin 2s linear infinite;
+    --animate-form-card: form-card 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    --animate-field-enter: field-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slide-up {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes star-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}
+
+@keyframes form-card {
+    from { opacity: 0; transform: translateY(24px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes field-enter {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+.field-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.field-card:focus-within {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.star-btn {
+    transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.star-btn:hover {
+    transform: scale(1.2);
+}
+
+.star-btn:hover ~ .star-btn svg {
+    color: #d1d5db;
+}
+
+.star-group:hover .star-btn svg {
+    color: #d1d5db;
+}
+
+.star-group:hover .star-btn:hover svg,
+.star-group:hover .star-btn:hover ~ .star-btn svg {
+    color: #3B82F6 !important;
+}
