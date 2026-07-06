@@ -212,38 +212,12 @@ artisan() {
 }
 
 create_admin_user() {
-    cat > /tmp/create-admin.php <<'PHP'
-<?php
+    if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then
+        echo "ERROR: ADMIN_EMAIL and ADMIN_PASSWORD are required." >&2
+        exit 1
+    fi
 
-require '/var/www/vendor/autoload.php';
-
-$app = require '/var/www/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-
-$email = getenv('ADMIN_EMAIL') ?: '';
-$password = getenv('ADMIN_PASSWORD') ?: '';
-$name = getenv('ADMIN_NAME') ?: 'Admin';
-
-if ($email === '' || $password === '') {
-    fwrite(STDERR, "ERROR: ADMIN_EMAIL and ADMIN_PASSWORD are required.\n");
-    exit(1);
-}
-
-$user = App\Models\User::updateOrCreate(
-    ['email' => $email],
-    [
-        'name' => $name,
-        'password' => Illuminate\Support\Facades\Hash::make($password),
-        'role' => 'admin',
-        'email_verified_at' => now(),
-    ],
-);
-
-echo "Admin user ready: {$user->email}\n";
-PHP
-
-    gosu www-data php /tmp/create-admin.php
-    rm -f /tmp/create-admin.php
+    artisan pqrsf:create-admin "${ADMIN_EMAIL}" --name="${ADMIN_NAME:-Admin}" --password="${ADMIN_PASSWORD}"
 }
 
 case "${1:-start}" in
