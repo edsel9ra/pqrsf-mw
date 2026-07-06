@@ -188,11 +188,28 @@ set -euo pipefail
 cd /var/www
 
 ensure_app_key() {
-    if [ -z "${APP_KEY:-}" ]; then
-        echo "ERROR: APP_KEY is required in production." >&2
-        echo "Generate one with: php artisan key:generate --show" >&2
-        exit 1
+    if [ -n "${APP_KEY:-}" ]; then
+        export APP_KEY
+        return
     fi
+
+    local key_file="storage/app/.app_key"
+
+    if [ -s "${key_file}" ]; then
+        APP_KEY="$(cat "${key_file}")"
+        export APP_KEY
+        echo "Using APP_KEY from persistent storage."
+        return
+    fi
+
+    APP_KEY="$(php -r 'echo "base64:".base64_encode(random_bytes(32));')"
+    export APP_KEY
+
+    printf '%s' "${APP_KEY}" > "${key_file}"
+    chown www-data:www-data "${key_file}"
+    chmod 600 "${key_file}"
+
+    echo "Generated APP_KEY and stored it in storage/app/.app_key. Set APP_KEY in Coolify to make it independent from the storage volume."
 }
 
 ensure_writable_dirs() {
@@ -222,8 +239,8 @@ create_admin_user() {
 
 case "${1:-start}" in
     start)
-        ensure_app_key
         ensure_writable_dirs
+        ensure_app_key
         artisan config:clear
         artisan migrate --force
         artisan storage:link --force || true
@@ -235,8 +252,8 @@ case "${1:-start}" in
         ;;
 
     admin-user)
-        ensure_app_key
         ensure_writable_dirs
+        ensure_app_key
         artisan config:clear
         artisan migrate --force
         create_admin_user
