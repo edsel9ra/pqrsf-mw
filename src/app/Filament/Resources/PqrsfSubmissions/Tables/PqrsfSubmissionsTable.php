@@ -108,6 +108,7 @@ class PqrsfSubmissionsTable
                     ->modalCancelActionLabel('Cerrar')
                     ->extraModalFooterActions(fn (): array => [
                         static::changeOptionAction(),
+                        static::changeRatingsAction(),
                     ])
                     ->schema(fn ($record): array => [
                         View::make('filament.pqrsf-submissions.view-modal')
@@ -264,6 +265,101 @@ class PqrsfSubmissionsTable
             });
     }
 
+    protected static function changeRatingsAction(): Action
+    {
+        return Action::make('changeRatings')
+            ->label('Cambiar calificaciones')
+            ->icon('heroicon-o-star')
+            ->color('warning')
+            ->visible(fn ($record): bool => $record->status === 'pending')
+            ->modalHeading(fn ($record): string => "Cambiar calificaciones PQRSF #{$record->id}")
+            ->modalDescription('Solo se pueden cambiar las calificaciones mientras la PQRSF está pendiente de validación.')
+            ->modalWidth(Width::Medium)
+            ->modalSubmitActionLabel('Guardar calificaciones')
+            ->fillForm(fn ($record): array => [
+                'calificacion_ambientacion' => $record->field_values['calificacion_ambientacion'] ?? null,
+                'calificacion_atencion' => $record->field_values['calificacion_atencion'] ?? null,
+                'calificacion_comida' => $record->field_values['calificacion_comida'] ?? null,
+                'calificacion_tiempo' => $record->field_values['calificacion_tiempo'] ?? null,
+            ])
+            ->schema([
+                SelectInput::make('calificacion_ambientacion')
+                    ->label('Ambientación')
+                    ->options(static::ratingChoices())
+                    ->required()
+                    ->native(false),
+                SelectInput::make('calificacion_atencion')
+                    ->label('Atención a la Mesa')
+                    ->options(static::ratingChoices())
+                    ->required()
+                    ->native(false),
+                SelectInput::make('calificacion_comida')
+                    ->label('Calidad de la Comida')
+                    ->options(static::ratingChoices())
+                    ->required()
+                    ->native(false),
+                SelectInput::make('calificacion_tiempo')
+                    ->label('Tiempo de Entrega')
+                    ->options(static::ratingChoices())
+                    ->required()
+                    ->native(false),
+            ])
+            ->action(function ($record, array $data): void {
+                if ($record->status !== 'pending') {
+                    Notification::make()
+                        ->title('No se pueden cambiar las calificaciones')
+                        ->body('La PQRSF ya no está pendiente de validación.')
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                $ratingKeys = [
+                    'calificacion_ambientacion' => 'Ambientación',
+                    'calificacion_atencion' => 'Atención',
+                    'calificacion_comida' => 'Comida',
+                    'calificacion_tiempo' => 'Tiempo',
+                ];
+                $values = $record->field_values ?? [];
+                $changes = [];
+
+                foreach ($ratingKeys as $key => $label) {
+                    $previous = is_numeric($values[$key] ?? null) ? (int) $values[$key] : null;
+                    $next = (int) $data[$key];
+
+                    if ($previous !== $next) {
+                        $changes[] = $label.': '.static::displayValue($previous).' a '.$next;
+                    }
+
+                    $values[$key] = $next;
+                }
+
+                if ($changes === []) {
+                    Notification::make()
+                        ->title('Las calificaciones no cambiaron')
+                        ->info()
+                        ->send();
+
+                    return;
+                }
+
+                $record->update(['field_values' => $values]);
+
+                SubmissionLog::create([
+                    'submission_id' => $record->id,
+                    'user_id' => auth()->id(),
+                    'action' => 'ratings_changed',
+                    'notas' => implode('; ', $changes),
+                ]);
+
+                Notification::make()
+                    ->title('Calificaciones actualizadas')
+                    ->success()
+                    ->send();
+            });
+    }
+
     protected static function getViewData($record): array
     {
         $values = $record->field_values ?? [];
@@ -356,6 +452,13 @@ class PqrsfSubmissionsTable
     {
         return collect(FormFieldService::defaultFields()['opcion_a_calificar']['options'])
             ->mapWithKeys(fn (string $option): array => [$option => $option])
+            ->all();
+    }
+
+    protected static function ratingChoices(): array
+    {
+        return collect(range(1, 5))
+            ->mapWithKeys(fn (int $score): array => [$score => $score.' - '.static::ratingDescription($score)])
             ->all();
     }
 

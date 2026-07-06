@@ -94,13 +94,18 @@
                     @elseif($field->type === 'boolean')
                         @if($key === 'autorizacion_datos')
                             <div class="p-5 rounded-xl bg-gradient-to-br from-blue-50/50 to-white border border-blue-100">
-                                <label class="inline-flex items-start cursor-pointer group">
-                                    <input type="checkbox" name="{{ $key }}" value="1" {{ old($key) ? 'checked' : '' }} @required($required)
-                                           class="mt-0.5 text-blue-500 focus:ring-blue-500 rounded transition-all duration-200 group-hover:scale-110">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                                        Autorizo el manejo de mis datos personales de acuerdo con la política de tratamiento de datos del restaurante. @if($required)<span class="text-red-500">*</span>@endif
-                                    </span>
-                                </label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2.5">{{ $label }} @if($required)<span class="text-red-500">*</span>@endif</label>
+                                <p class="mb-3 text-sm text-gray-600">Autorizo el manejo de mis datos personales de acuerdo con la política de tratamiento de datos del restaurante.</p>
+                                <div class="flex gap-4">
+                                    <label class="inline-flex items-center px-4 py-2.5 rounded-xl border border-gray-200 cursor-pointer transition-all duration-200 hover:border-blue-300 hover:bg-blue-50/50 has-checked:border-blue-500 has-checked:bg-blue-50">
+                                        <input type="radio" name="{{ $key }}" value="1" {{ old($key) == '1' ? 'checked' : '' }} @required($required) class="text-blue-500 focus:ring-blue-500">
+                                        <span class="ml-2 text-gray-700 text-sm font-medium">Sí</span>
+                                    </label>
+                                    <label class="inline-flex items-center px-4 py-2.5 rounded-xl border border-gray-200 cursor-pointer transition-all duration-200 hover:border-blue-300 hover:bg-blue-50/50 has-checked:border-blue-500 has-checked:bg-blue-50">
+                                        <input type="radio" name="{{ $key }}" value="0" {{ old($key) == '0' ? 'checked' : '' }} @required($required) class="text-blue-500 focus:ring-blue-500">
+                                        <span class="ml-2 text-gray-700 text-sm font-medium">No</span>
+                                    </label>
+                                </div>
                             </div>
                         @else
                             <label class="block text-sm font-medium text-gray-700 mb-2.5">{{ $label }} @if($required)<span class="text-red-500">*</span>@endif</label>

@@ -22,7 +22,7 @@
                             <td style="padding: 0.75rem 1rem; font-weight: 600; color: #1f2937;">{{ $row['sede'] }}</td>
                             @php $pctFields = ['atencion', 'comida', 'tiempo', 'ambientacion', 'promedio']; @endphp
                             @foreach ($pctFields as $field)
-                                @php $isLow = $row[$field] < 98; @endphp
+                                @php $isLow = $field === 'tiempo' ? $row[$field] < 96 : $row[$field] < 98; @endphp
                                 <td style="padding: 0.75rem 1rem; text-align: center; {{ $isLow ? 'color: #dc2626; font-weight: 700;' : 'color: #1f2937;' }}">{{ number_format($row[$field], 2) }}%</td>
                             @endforeach
                         </tr>
@@ -38,7 +38,7 @@
                             <td style="padding: 0.85rem 1rem; font-weight: 800; color: #111827;">TOTAL GENERAL</td>
                             <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 800; color: #111827;">{{ number_format($grandTotal['atencion'], 2) }}%</td>
                             <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 800; color: #111827;">{{ number_format($grandTotal['comida'], 2) }}%</td>
-                            <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 800; color: #111827;">{{ number_format($grandTotal['tiempo'], 2) }}%</td>
+                            <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 800; {{ $grandTotal['tiempo'] < 96 ? 'color: #dc2626;' : 'color: #111827;' }}">{{ number_format($grandTotal['tiempo'], 2) }}%</td>
                             <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 800; color: #111827;">{{ number_format($grandTotal['ambientacion'], 2) }}%</td>
                             <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 800; color: #111827;">{{ number_format($grandTotal['promedio'], 2) }}%</td>
                         </tr>

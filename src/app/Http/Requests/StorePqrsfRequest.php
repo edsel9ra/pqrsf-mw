@@ -89,9 +89,7 @@ class StorePqrsfRequest extends FormRequest
             'textarea' => [...$rules, 'string', ...$this->configuredRules($field)],
             'select' => [...$rules, 'string', ...$this->inRules($field), ...$this->configuredRules($field)],
             'rating' => [...$rules, 'integer', ...$this->configuredRules($field)],
-            'boolean' => $field->key === 'autorizacion_datos'
-                ? [...$rules, 'accepted']
-                : [...$rules, 'boolean', ...$this->configuredRules($field)],
+            'boolean' => [...$rules, 'boolean', ...$this->configuredRules($field)],
             'checkbox_list' => [
                 ...$rules,
                 'array',
@@ -150,8 +148,7 @@ class StorePqrsfRequest extends FormRequest
             'calificacion_comida.required' => 'Debe calificar la calidad de la comida.',
             'calificacion_tiempo.required' => 'Debe calificar el tiempo de entrega.',
             'recomendaria.required' => 'Debe indicar si recomendaría el restaurante.',
-            'autorizacion_datos.required' => 'Debe autorizar el manejo de datos personales.',
-            'autorizacion_datos.accepted' => 'Debe aceptar la autorización de datos personales.',
+            'autorizacion_datos.required' => 'Debe indicar si autoriza el manejo de datos personales.',
         ];
     }
 }

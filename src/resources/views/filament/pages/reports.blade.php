@@ -730,7 +730,7 @@
                                         <tr>
                                             <td data-label="Sede"><strong>{{ $item->sede }}</strong></td>
                                             @foreach ($pctOptions as $key => $label)
-                                                @php $isLow = $item->$key < 98; @endphp
+                                                @php $isLow = $key === 'tiempo' ? $item->$key < 96 : $item->$key < 98; @endphp
                                                 <td data-label="{{ $label }}" style="{{ $isLow ? 'color:#dc2626; font-weight:700;' : '' }}">{{ number_format($item->$key, 2) }}%</td>
                                             @endforeach
                                             @php $promIsLow = $item->promedio < 98; @endphp

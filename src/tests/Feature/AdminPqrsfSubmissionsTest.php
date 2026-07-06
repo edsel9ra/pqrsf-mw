@@ -59,6 +59,44 @@ class AdminPqrsfSubmissionsTest extends TestCase
             ->assertTableActionHidden(['view', 'changeOption'], $submission);
     }
 
+    public function test_pending_submission_ratings_can_be_changed_from_detail_action(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $submission = $this->makeSubmission(['status' => 'pending']);
+
+        Livewire::actingAs($user)
+            ->test(ListPqrsfSubmissions::class)
+            ->callTableAction(['view', 'changeRatings'], $submission, [
+                'calificacion_ambientacion' => 4,
+                'calificacion_atencion' => 3,
+                'calificacion_comida' => 2,
+                'calificacion_tiempo' => 1,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $submission->refresh();
+
+        $this->assertSame(4, $submission->field_values['calificacion_ambientacion']);
+        $this->assertSame(3, $submission->field_values['calificacion_atencion']);
+        $this->assertSame(2, $submission->field_values['calificacion_comida']);
+        $this->assertSame(1, $submission->field_values['calificacion_tiempo']);
+        $this->assertDatabaseHas('submission_logs', [
+            'submission_id' => $submission->id,
+            'user_id' => $user->id,
+            'action' => 'ratings_changed',
+        ]);
+    }
+
+    public function test_validated_submission_ratings_change_action_is_hidden(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $submission = $this->makeSubmission(['status' => 'validated']);
+
+        Livewire::actingAs($user)
+            ->test(ListPqrsfSubmissions::class)
+            ->assertTableActionHidden(['view', 'changeRatings'], $submission);
+    }
+
     public function test_submissions_can_be_filtered_by_option(): void
     {
         $user = User::factory()->create(['role' => 'admin']);

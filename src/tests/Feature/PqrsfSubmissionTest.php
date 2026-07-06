@@ -99,6 +99,19 @@ class PqrsfSubmissionTest extends TestCase
         $this->assertIsArray($submission->field_values['medio_conocimiento']);
     }
 
+    public function test_authorization_data_can_be_declined(): void
+    {
+        $response = $this->post('/pqrsf', $this->validPayload([
+            'autorizacion_datos' => '0',
+        ]));
+
+        $response->assertSessionHasNoErrors();
+
+        $submission = PqrsfSubmission::first();
+
+        $this->assertFalse($submission->field_values['autorizacion_datos']);
+    }
+
     public function test_inactive_sede_cannot_receive_submission(): void
     {
         Sede::factory()->create(['id' => 2, 'nombre' => 'Sede Inactiva', 'activo' => false]);
