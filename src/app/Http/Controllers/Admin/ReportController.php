@@ -49,7 +49,21 @@ class ReportController extends Controller
             ratingCategory: $validated['rating_category'] ?? null,
         );
 
-        return $service->getAll();
+        return [
+            ...$service->getAll(),
+            'logoSrc' => $this->logoDataUri(),
+        ];
+    }
+
+    private function logoDataUri(): string
+    {
+        $path = public_path('logo_mw.png');
+
+        if (! is_file($path)) {
+            return '';
+        }
+
+        return 'data:image/png;base64,'.base64_encode(file_get_contents($path));
     }
 
     protected function validateDateRange(array $filters): void

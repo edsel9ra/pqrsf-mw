@@ -13,6 +13,7 @@ class PqrsfSubmissionPdfController extends Controller
 
         $pdf = Pdf::loadView('emails.pqrsf-submission-pdf', [
             'submission' => $submission,
+            'logoSrc' => $this->logoDataUri(),
         ]);
 
         $pdf->setPaper('letter');
@@ -26,5 +27,16 @@ class PqrsfSubmissionPdfController extends Controller
         ]);
 
         return $pdf->stream('pqrsf-'.$submission->id.'.pdf');
+    }
+
+    private function logoDataUri(): string
+    {
+        $path = public_path('logo_mw.png');
+
+        if (! is_file($path)) {
+            return '';
+        }
+
+        return 'data:image/png;base64,'.base64_encode(file_get_contents($path));
     }
 }

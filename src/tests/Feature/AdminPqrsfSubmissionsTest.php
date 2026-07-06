@@ -101,6 +101,7 @@ class AdminPqrsfSubmissionsTest extends TestCase
         $html = (new PqrsfSubmissionMail($submission))->render();
 
         $this->assertStringContainsString('Abrir PDF', $html);
+        $this->assertStringContainsString('data:image/png;base64,', $html);
         $this->assertStringContainsString('/pqrsf-submissions/'.$submission->id.'/pdf', $html);
         $this->assertStringNotContainsString('Ver en el panel', $html);
         $this->assertStringNotContainsString('/admin/pqrsf-submissions', $html);

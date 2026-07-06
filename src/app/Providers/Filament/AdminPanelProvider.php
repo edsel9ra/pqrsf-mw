@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Dashboard;
 use App\Filament\Widgets\LatestSubmissions;
 use App\Filament\Widgets\RatingsChart;
 use App\Filament\Widgets\SedeOptionsChart;
@@ -11,7 +12,6 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use App\Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -32,6 +32,11 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->brandName(config('app.name'))
+            ->brandLogo(asset('logo_mw.png'))
+            ->darkModeBrandLogo(asset('logo_mw.png'))
+            ->brandLogoHeight('3.5rem')
+            ->favicon(asset('logo_mw.png'))
             ->colors([
                 'primary' => Color::Amber,
             ])

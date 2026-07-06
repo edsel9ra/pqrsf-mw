@@ -28,6 +28,12 @@
     $observations = filled($values['observaciones'] ?? null)
         ? $values['observaciones']
         : 'Sin observaciones registradas.';
+    $logoSrc = $logoSrc ?? null;
+
+    if (! $logoSrc && isset($message)) {
+        $logoPath = public_path('logo_mw.png');
+        $logoSrc = is_file($logoPath) ? $message->embed($logoPath) : null;
+    }
 @endphp
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 0 0 24px;">
@@ -36,8 +42,19 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; overflow: hidden; border-radius: 22px; background: #14110f;">
 <tr>
 <td style="padding: 28px 30px 26px; background: linear-gradient(135deg, #14110f 0%, #24180f 58%, #8a4b13 140%); color: #ffffff;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+<tr>
+<td style="padding: 0; vertical-align: top;">
 <div style="margin: 0 0 12px; color: #f6b84b; font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;">Nuevo expediente PQRSF</div>
 <h1 style="margin: 0; color: #ffffff; font-size: 30px; font-weight: 900; line-height: 1.05; letter-spacing: -0.04em;">Solicitud #{{ $submission->id }}</h1>
+</td>
+@if ($logoSrc)
+<td align="right" style="padding: 0 0 0 18px; vertical-align: top; width: 120px;">
+<img src="{{ $logoSrc }}" alt="Logo MW" width="108" style="display: block; width: 108px; max-width: 108px; height: auto; border: 0; border-radius: 12px; background: #ffffff; padding: 8px;">
+</td>
+@endif
+</tr>
+</table>
 <p style="margin: 12px 0 0; color: #f8e4c4; font-size: 15px; line-height: 1.6;">Se registró una nueva interacción de cliente para seguimiento administrativo.</p>
 </td>
 </tr>

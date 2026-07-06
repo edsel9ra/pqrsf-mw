@@ -20,6 +20,25 @@
             border-radius: 5px;
             margin-bottom: 10px;
         }
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .header-title {
+            vertical-align: middle;
+        }
+        .header-logo {
+            width: 86px;
+            text-align: right;
+            vertical-align: middle;
+        }
+        .header-logo img {
+            width: 72px;
+            height: auto;
+            background: #fff;
+            border-radius: 4px;
+            padding: 5px;
+        }
         .header h1 {
             font-size: 18px;
             color: #fff;
@@ -240,13 +259,24 @@
 </script>
 
 <div class="header">
-    <h1>Reporte PQRSF</h1>
-    <div class="header-meta">
-        Generado: {{ $generatedAt }}
-        @foreach ($filterLabels as $label)
-            <span class="tag">{{ $label }}</span>
-        @endforeach
-    </div>
+    <table class="header-table">
+        <tr>
+            <td class="header-title">
+                <h1>Reporte PQRSF</h1>
+                <div class="header-meta">
+                    Generado: {{ $generatedAt }}
+                    @foreach ($filterLabels as $label)
+                        <span class="tag">{{ $label }}</span>
+                    @endforeach
+                </div>
+            </td>
+            @if ($logoSrc)
+            <td class="header-logo">
+                <img src="{{ $logoSrc }}" alt="Logo MW">
+            </td>
+            @endif
+        </tr>
+    </table>
 </div>
 
 <h2>Resumen general y calificaciones</h2>
