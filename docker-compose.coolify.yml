@@ -1,0 +1,96 @@
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile.prod
+
+x-app-environment: &app-environment
+  APP_NAME: ${APP_NAME:-PQRSF}
+  APP_ENV: production
+  APP_KEY: ${APP_KEY}
+  APP_DEBUG: "false"
+  APP_URL: ${APP_URL:-http://localhost}
+  APP_TIMEZONE: ${APP_TIMEZONE:-America/Bogota}
+  APP_LOCALE: es
+  APP_FALLBACK_LOCALE: es
+  APP_FAKER_LOCALE: es_CO
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: ${LOG_LEVEL:-warning}
+  DB_CONNECTION: mysql
+  DB_HOST: ${DB_HOST:-db}
+  DB_PORT: ${DB_PORT:-3306}
+  DB_DATABASE: ${DB_DATABASE:-pqrsf}
+  DB_USERNAME: ${DB_USERNAME:-pqrsf}
+  DB_PASSWORD: ${DB_PASSWORD}
+  SESSION_DRIVER: database
+  SESSION_LIFETIME: ${SESSION_LIFETIME:-120}
+  SESSION_ENCRYPT: "false"
+  SESSION_DOMAIN: ${SESSION_DOMAIN:-}
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  FILESYSTEM_DISK: local
+  MAIL_MAILER: ${MAIL_MAILER:-smtp}
+  MAIL_SCHEME: ${MAIL_SCHEME:-}
+  MAIL_HOST: ${MAIL_HOST:-}
+  MAIL_PORT: ${MAIL_PORT:-587}
+  MAIL_USERNAME: ${MAIL_USERNAME:-}
+  MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-noreply@example.com}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-PQRSF}
+  VITE_APP_NAME: ${APP_NAME:-PQRSF}
+
+services:
+  app:
+    build: *app-build
+    image: ${APP_IMAGE:-pqrsf-platform:production}
+    restart: unless-stopped
+    environment: *app-environment
+    expose:
+      - "80"
+    volumes:
+      - app_storage:/var/www/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/up >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  db:
+    image: mysql:8.4.10
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-pqrsf}
+      MYSQL_USER: ${DB_USERNAME:-pqrsf}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  admin-user:
+    profiles:
+      - admin
+    build: *app-build
+    image: ${APP_IMAGE:-pqrsf-platform:production}
+    restart: "no"
+    command: ["admin-user"]
+    environment:
+      <<: *app-environment
+      ADMIN_NAME: ${ADMIN_NAME:-Admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - app_storage:/var/www/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  app_storage:
+  db_data:
