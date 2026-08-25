@@ -3,33 +3,25 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\ReportService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\ReportPdfService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class ReportController extends Controller
 {
-    public function pdf(Request $request)
+    public function pdf(Request $request, ReportPdfService $reportPdfService)
     {
-        $data = $this->getReportData($request);
+        $filters = $this->getValidatedFilters($request);
+        $report = $reportPdfService->generate($filters);
 
-        $pdf = Pdf::loadView('reports.pdf', $data);
-        $pdf->setPaper('letter', 'landscape');
-        $pdf->setOptions([
-            'defaultFont' => 'sans-serif',
-            'isHtml5ParserEnabled' => true,
-            'isRemoteEnabled' => false,
-            'isJavascriptEnabled' => true,
-            'dpi' => 150,
-            'fontHeightRatio' => 1.1,
+        return response($report['content'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$report['filename'].'"',
         ]);
-
-        return $pdf->download('reporte-pqrsf-'.now()->format('Y-m-d').'.pdf');
     }
 
-    protected function getReportData(Request $request): array
+    protected function getValidatedFilters(Request $request): array
     {
         $validated = $request->validate([
             'sede_id' => 'nullable|integer|exists:sedes,id',
@@ -41,29 +33,7 @@ class ReportController extends Controller
 
         $this->validateDateRange($validated);
 
-        $service = ReportService::make(
-            sedeId: $validated['sede_id'] ?? null,
-            dateFrom: $validated['date_from'] ?? null,
-            dateTo: $validated['date_to'] ?? null,
-            optionType: $validated['option_type'] ?? null,
-            ratingCategory: $validated['rating_category'] ?? null,
-        );
-
-        return [
-            ...$service->getAll(),
-            'logoSrc' => $this->logoDataUri(),
-        ];
-    }
-
-    private function logoDataUri(): string
-    {
-        $path = public_path('logo_mw.png');
-
-        if (! is_file($path)) {
-            return '';
-        }
-
-        return 'data:image/png;base64,'.base64_encode(file_get_contents($path));
+        return $validated;
     }
 
     protected function validateDateRange(array $filters): void

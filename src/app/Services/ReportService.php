@@ -85,8 +85,6 @@ class ReportService
         $base = $this->baseQuery();
         $total = (clone $base)->count();
         $pending = (clone $base)->where('status', 'pending')->count();
-        $validated = (clone $base)->where('status', 'validated')->count();
-        $sent = (clone $base)->where('status', 'sent')->count();
 
         $ratings = (clone $base)->select(
             DB::raw('ROUND(AVG(JSON_EXTRACT(field_values, "$.calificacion_ambientacion")), 1) as ambientacion'),
@@ -102,8 +100,6 @@ class ReportService
         return [
             'total' => $total,
             'pending' => $pending,
-            'validated' => $validated,
-            'sent' => $sent,
             'avg_ambientacion' => $ratings?->ambientacion ?? 0,
             'avg_atencion' => $ratings?->atencion ?? 0,
             'avg_comida' => $ratings?->comida ?? 0,
@@ -171,37 +167,6 @@ class ReportService
             $result->push((object) [
                 'opcion' => $label,
                 'total' => $count,
-                'porcentaje' => $total > 0 ? round($count / $total * 100, 1) : 0,
-            ]);
-        }
-
-        return $result;
-    }
-
-    public function getStatusDistribution(): Collection
-    {
-        $base = $this->baseQuery();
-        $total = (clone $base)->count();
-
-        $rows = (clone $base)
-            ->select('status', DB::raw('COUNT(*) as total'))
-            ->groupBy('status')
-            ->pluck('total', 'status');
-
-        $labels = [
-            'pending' => ['label' => 'Pendientes', 'color' => '#f59e0b'],
-            'validated' => ['label' => 'Validados', 'color' => '#3b82f6'],
-            'sent' => ['label' => 'Enviados', 'color' => '#22c55e'],
-        ];
-
-        $result = collect();
-        foreach ($labels as $key => $info) {
-            $count = (int) ($rows[$key] ?? 0);
-            $result->push((object) [
-                'status' => $key,
-                'label' => $info['label'],
-                'total' => $count,
-                'color' => $info['color'],
                 'porcentaje' => $total > 0 ? round($count / $total * 100, 1) : 0,
             ]);
         }
@@ -325,6 +290,14 @@ class ReportService
         if ($this->optionType) {
             $parts[] = 'Opción: '.$this->optionType;
         }
+        if ($this->ratingCategory) {
+            $parts[] = 'Categoría: '.([
+                'ambientacion' => 'Ambientación',
+                'atencion' => 'Atención a la Mesa',
+                'comida' => 'Calidad de la Comida',
+                'tiempo' => 'Tiempo de Entrega',
+            ][$this->ratingCategory] ?? $this->ratingCategory);
+        }
 
         return $parts;
     }
@@ -416,7 +389,6 @@ class ReportService
             'stats' => $this->getStats(),
             'ratingsBySede' => $this->getRatingsBySede(),
             'optionsBreakdown' => $this->getOptionsBreakdown(),
-            'statusDistribution' => $this->getStatusDistribution(),
             'dailySubmissions' => $this->getDailySubmissions(),
             'ratingAverages' => $this->getRatingAveragesByCategory(),
             'pqrsfBySede' => $this->getPqrsfBySede(),

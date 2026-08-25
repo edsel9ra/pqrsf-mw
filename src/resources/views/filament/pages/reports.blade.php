@@ -157,8 +157,6 @@
 
         .pqrs-report-stat.total { color: #334155; }
         .pqrs-report-stat.pending { color: var(--pqrs-amber); }
-        .pqrs-report-stat.validated { color: var(--pqrs-blue); }
-        .pqrs-report-stat.sent { color: var(--pqrs-green); }
 
         .pqrs-report-stat-label {
             display: block;
@@ -293,14 +291,6 @@
         .pqrs-report-badge.mid { background: rgba(217, 119, 6, 0.13); color: #b45309; }
         .pqrs-report-badge.low { background: rgba(220, 38, 38, 0.11); color: #b91c1c; }
 
-        .pqrs-report-split {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
-            gap: 1rem;
-            min-width: 0;
-            max-width: 100%;
-        }
-
         .pqrs-report-bars {
             display: grid;
             gap: 0.85rem;
@@ -350,9 +340,6 @@
         .pqrs-report-bar-fill.peticion { background: var(--pqrs-blue); }
         .pqrs-report-bar-fill.sugerencia { background: #64748b; }
         .pqrs-report-bar-fill.felicitacion { background: var(--pqrs-green); }
-        .pqrs-report-bar-fill.pending { background: var(--pqrs-amber); }
-        .pqrs-report-bar-fill.validated { background: var(--pqrs-blue); }
-        .pqrs-report-bar-fill.sent { background: var(--pqrs-green); }
 
         .pqrs-report-footer {
             display: flex;
@@ -368,10 +355,6 @@
         }
 
         @media (max-width: 1100px) {
-            .pqrs-report-split {
-                grid-template-columns: 1fr;
-            }
-
             .pqrs-report-table {
                 min-width: 36rem;
             }
@@ -571,6 +554,9 @@
                         <x-filament::button tag="a" href="{{ $this->getDownloadUrl('pdf') }}" icon="heroicon-o-document-arrow-down" color="danger" target="_blank">
                             Descargar PDF
                         </x-filament::button>
+                        <x-filament::button type="button" wire:click="sendReport" wire:confirm="¿Enviar este reporte a los destinatarios activos de la sede seleccionada?" icon="heroicon-o-envelope" color="success">
+                            Enviar por correo
+                        </x-filament::button>
                     </div>
                 </div>
 
@@ -584,16 +570,6 @@
                         <span class="pqrs-report-stat-label">Pendientes</span>
                         <strong class="pqrs-report-stat-value">{{ $stats['pending'] }}</strong>
                         <span class="pqrs-report-stat-note">Por validar</span>
-                    </article>
-                    <article class="pqrs-report-stat validated">
-                        <span class="pqrs-report-stat-label">Validados</span>
-                        <strong class="pqrs-report-stat-value">{{ $stats['validated'] }}</strong>
-                        <span class="pqrs-report-stat-note">Listos para enviar</span>
-                    </article>
-                    <article class="pqrs-report-stat sent">
-                        <span class="pqrs-report-stat-label">Enviados</span>
-                        <strong class="pqrs-report-stat-value">{{ $stats['sent'] }}</strong>
-                        <span class="pqrs-report-stat-note">Notificados a sede</span>
                     </article>
                 </div>
 
@@ -744,47 +720,25 @@
                 @endif
 
                 @if ($reportData['optionsBreakdown']->isNotEmpty())
-                    <div class="pqrs-report-split">
-                        <section class="pqrs-report-card">
-                            <div>
-                                <p class="pqrs-report-eyebrow">Tipo de solicitud</p>
-                                <h3 class="pqrs-report-title">Distribución por opción</h3>
-                            </div>
-                            <div class="pqrs-report-bars">
-                                @foreach ($reportData['optionsBreakdown'] as $item)
-                                    <div class="pqrs-report-bar-row">
-                                        <div class="pqrs-report-bar-meta">
-                                            <span>{{ $item->opcion }}</span>
-                                            <small>{{ $item->total }} ({{ $item->porcentaje }}%)</small>
-                                        </div>
-                                        <div class="pqrs-report-bar-track">
-                                            <div class="pqrs-report-bar-fill {{ $optionClass[$item->opcion] ?? 'sugerencia' }}" style="width: {{ $item->porcentaje }}%"></div>
-                                        </div>
+                    <section class="pqrs-report-card">
+                        <div>
+                            <p class="pqrs-report-eyebrow">Tipo de solicitud</p>
+                            <h3 class="pqrs-report-title">Distribución por opción</h3>
+                        </div>
+                        <div class="pqrs-report-bars">
+                            @foreach ($reportData['optionsBreakdown'] as $item)
+                                <div class="pqrs-report-bar-row">
+                                    <div class="pqrs-report-bar-meta">
+                                        <span>{{ $item->opcion }}</span>
+                                        <small>{{ $item->total }} ({{ $item->porcentaje }}%)</small>
                                     </div>
-                                @endforeach
-                            </div>
-                        </section>
-
-                        <section class="pqrs-report-card">
-                            <div>
-                                <p class="pqrs-report-eyebrow">Flujo operativo</p>
-                                <h3 class="pqrs-report-title">Distribución por estado</h3>
-                            </div>
-                            <div class="pqrs-report-bars">
-                                @foreach ($reportData['statusDistribution'] as $item)
-                                    <div class="pqrs-report-bar-row">
-                                        <div class="pqrs-report-bar-meta">
-                                            <span>{{ $item->label }}</span>
-                                            <small>{{ $item->total }} ({{ $item->porcentaje }}%)</small>
-                                        </div>
-                                        <div class="pqrs-report-bar-track">
-                                            <div class="pqrs-report-bar-fill {{ $item->status }}" style="width: {{ $item->porcentaje }}%"></div>
-                                        </div>
+                                    <div class="pqrs-report-bar-track">
+                                        <div class="pqrs-report-bar-fill {{ $optionClass[$item->opcion] ?? 'sugerencia' }}" style="width: {{ $item->porcentaje }}%"></div>
                                     </div>
-                                @endforeach
-                            </div>
-                        </section>
-                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
                 @endif
 
                 @if ($reportData['dailySubmissions']->isNotEmpty())

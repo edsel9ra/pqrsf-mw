@@ -2,8 +2,9 @@
 
 namespace App\Filament\Pages;
 
+use App\Mail\ReportPdfMail;
 use App\Models\Sede;
-use App\Services\ReportService;
+use App\Services\ReportPdfService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Actions\Action;
@@ -15,6 +16,9 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
+use Throwable;
 use UnitEnum;
 
 class Reports extends Page implements HasForms
@@ -36,6 +40,8 @@ class Reports extends Page implements HasForms
     public ?array $filterData = [];
 
     public array $reportData = [];
+
+    public array $appliedFilters = [];
 
     public bool $showReport = false;
 
@@ -90,39 +96,162 @@ class Reports extends Page implements HasForms
 
     public function generateReport(): void
     {
-        $state = $this->form->getState();
-        $f = $state['filterData'] ?? [];
+        $filters = $this->getFormFilters();
 
-        if (! $this->dateRangeIsValid($f)) {
+        if (! $this->filtersAreValid($filters)) {
             return;
         }
 
-        $service = ReportService::make(
-            sedeId: $f['sede_id'] ?? null,
-            dateFrom: $f['date_from'] ?? null,
-            dateTo: $f['date_to'] ?? null,
-            optionType: $f['option_type'] ?? null,
-            ratingCategory: $f['rating_category'] ?? null,
-        );
-
-        $this->reportData = $service->getAll();
+        $this->appliedFilters = $filters;
+        $this->reportData = app(ReportPdfService::class)->getData($filters);
         $this->showReport = true;
+    }
+
+    public function sendReport(): void
+    {
+        if (! $this->showReport || $this->appliedFilters === []) {
+            Notification::make()
+                ->title('Genere el reporte antes de enviarlo')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $sedeId = $this->appliedFilters['sede_id'] ?? null;
+
+        if (! $sedeId) {
+            Notification::make()
+                ->title('Seleccione una sede para enviar el reporte')
+                ->body('Un reporte de todas las sedes no tiene un grupo único de destinatarios.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $sede = Sede::query()
+            ->with(['sedeRecipients' => fn ($query) => $query->where('activo', true)->orderBy('id')])
+            ->find($sedeId);
+
+        if (! $sede) {
+            Notification::make()
+                ->title('La sede seleccionada no está disponible')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $recipients = $sede->sedeRecipients;
+
+        if ($recipients->isEmpty()) {
+            Notification::make()
+                ->title('No hay destinatarios activos para esta sede')
+                ->body('Configure al menos un destinatario activo antes de enviar el reporte.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $report = app(ReportPdfService::class)->generate($this->appliedFilters);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('No se pudo generar el PDF')
+                ->body('Intente nuevamente o revise los filtros seleccionados.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $sent = [];
+        $failed = [];
+
+        foreach ($recipients as $recipient) {
+            try {
+                Mail::to($recipient->email, $recipient->nombre)
+                    ->send(new ReportPdfMail(
+                        pdfContent: $report['content'],
+                        filename: $report['filename'],
+                        sedeName: $sede->nombre,
+                        filterLabels: $report['data']['filterLabels'],
+                        generatedAt: $report['data']['generatedAt'],
+                    ));
+
+                $sent[] = $recipient->email;
+            } catch (Throwable $exception) {
+                report($exception);
+                $failed[] = $recipient->email;
+            }
+        }
+
+        if ($failed !== []) {
+            Notification::make()
+                ->title('El reporte no se envió a todos los destinatarios')
+                ->body('Enviados: '.count($sent).'. Fallidos: '.implode(', ', $failed))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Reporte enviado correctamente')
+            ->body('Se envió a '.$recipients->count().' destinatario(s) de '.$sede->nombre.'.')
+            ->success()
+            ->send();
     }
 
     public function getDownloadUrl(string $format): string
     {
-        $state = $this->form->getState();
-        $f = $state['filterData'] ?? [];
-
-        $params = array_filter([
-            'sede_id' => $f['sede_id'] ?? null,
-            'date_from' => $f['date_from'] ?? null,
-            'date_to' => $f['date_to'] ?? null,
-            'option_type' => $f['option_type'] ?? null,
-            'rating_category' => $f['rating_category'] ?? null,
-        ], fn ($value) => $value !== null && $value !== '');
+        $params = array_filter(
+            $this->appliedFilters,
+            fn ($value) => $value !== null && $value !== '',
+        );
 
         return route("admin.reportes.{$format}", $params);
+    }
+
+    protected function getFormFilters(): array
+    {
+        $state = $this->form->getState();
+        $filters = $state['filterData'] ?? [];
+
+        return [
+            'sede_id' => filled($filters['sede_id'] ?? null) ? (int) $filters['sede_id'] : null,
+            'date_from' => $filters['date_from'] ?? null,
+            'date_to' => $filters['date_to'] ?? null,
+            'option_type' => $filters['option_type'] ?? null,
+            'rating_category' => $filters['rating_category'] ?? null,
+        ];
+    }
+
+    protected function filtersAreValid(array $filters): bool
+    {
+        $validator = Validator::make($filters, [
+            'sede_id' => 'nullable|integer|exists:sedes,id',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+            'option_type' => 'nullable|string|in:Queja,Reclamo,Petición,Sugerencia,Felicitación',
+            'rating_category' => 'nullable|string|in:ambientacion,atencion,comida,tiempo',
+        ]);
+
+        if ($validator->fails()) {
+            Notification::make()
+                ->title('Filtros inválidos')
+                ->body($validator->errors()->first())
+                ->danger()
+                ->send();
+
+            return false;
+        }
+
+        return $this->dateRangeIsValid($filters);
     }
 
     protected function dateRangeIsValid(array $filters): bool
