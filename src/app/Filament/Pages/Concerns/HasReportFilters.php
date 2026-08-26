@@ -29,14 +29,17 @@ trait HasReportFilters
                     ->placeholder('Todas las sedes')
                     ->options(fn () => Sede::orderBy('nombre')->pluck('nombre', 'id'))
                     ->multiple()
+                    ->live()
                     ->searchable()
                     ->preload()
                     ->native(false),
                 DatePicker::make('filterData.date_from')
                     ->label('Desde')
+                    ->live()
                     ->native(false),
                 DatePicker::make('filterData.date_to')
                     ->label('Hasta')
+                    ->live()
                     ->native(false),
             ])
             ->columns([

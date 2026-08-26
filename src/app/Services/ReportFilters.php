@@ -43,9 +43,18 @@ final class ReportFilters
     {
         return [
             'sede_id' => self::normalizeSedeIds($filters['sede_id'] ?? null),
-            'date_from' => $filters['date_from'] ?? null,
-            'date_to' => $filters['date_to'] ?? null,
+            'date_from' => self::normalizeDate($filters['date_from'] ?? null),
+            'date_to' => self::normalizeDate($filters['date_to'] ?? null),
         ];
+    }
+
+    public static function normalizeDate(mixed $date): ?string
+    {
+        if (blank($date)) {
+            return null;
+        }
+
+        return Carbon::parse($date)->toDateString();
     }
 
     public static function validateDateRange(array $filters): void

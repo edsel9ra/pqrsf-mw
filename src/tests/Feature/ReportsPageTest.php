@@ -122,6 +122,48 @@ class ReportsPageTest extends TestCase
         $this->assertSame('%PDF-1.7 multi-sede', $response->getContent());
     }
 
+    public function test_report_download_url_preserves_multiple_sedes_and_dates(): void
+    {
+        $user = User::first();
+        $sedes = Sede::factory()->createMany([
+            ['nombre' => 'Sede A'],
+            ['nombre' => 'Sede B'],
+        ]);
+        $filters = [
+            'sede_id' => [$sedes[0]->id, $sedes[1]->id],
+            'date_from' => '2026-01-01',
+            'date_to' => '2026-01-31',
+            'option_type' => 'Queja',
+            'rating_category' => 'tiempo',
+        ];
+
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldReceive('getData')
+            ->once()
+            ->with($filters)
+            ->andReturn($this->emptyReportData());
+        $this->app->instance(ReportPdfService::class, $pdfService);
+
+        $component = Livewire::actingAs($user)
+            ->test(Reports::class)
+            ->fillForm([
+                'filterData.sede_id' => $filters['sede_id'],
+                'filterData.date_from' => $filters['date_from'],
+                'filterData.date_to' => $filters['date_to'],
+                'filterData.option_type' => $filters['option_type'],
+                'filterData.rating_category' => $filters['rating_category'],
+            ])
+            ->call('generateReport');
+
+        parse_str((string) parse_url($component->instance()->getDownloadUrl('pdf'), PHP_URL_QUERY), $query);
+
+        $this->assertSame($filters['sede_id'], array_map('intval', $query['sede_id']));
+        $this->assertSame($filters['date_from'], $query['date_from']);
+        $this->assertSame($filters['date_to'], $query['date_to']);
+        $this->assertSame($filters['option_type'], $query['option_type']);
+        $this->assertSame($filters['rating_category'], $query['rating_category']);
+    }
+
     public function test_report_pdf_does_not_include_removed_status_sections(): void
     {
         $reportData = $this->emptyReportData();

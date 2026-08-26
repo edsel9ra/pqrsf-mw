@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Mail\ReportPdfMail;
 use App\Models\Sede;
+use App\Services\ReportFilters;
 use App\Services\ReportPdfService;
 use BackedEnum;
 use Carbon\Carbon;
@@ -60,14 +61,17 @@ class Reports extends Page implements HasForms
                     ->placeholder('Todas las sedes')
                     ->options(fn () => Sede::orderBy('nombre')->pluck('nombre', 'id'))
                     ->multiple()
+                    ->live()
                     ->searchable()
                     ->preload()
                     ->native(false),
                 DatePicker::make('filterData.date_from')
                     ->label('Desde')
+                    ->live()
                     ->native(false),
                 DatePicker::make('filterData.date_to')
                     ->label('Hasta')
+                    ->live()
                     ->native(false),
                 Select::make('filterData.option_type')
                     ->label('Opción a calificar')
@@ -326,10 +330,12 @@ class Reports extends Page implements HasForms
 
     protected function normalizeFilters(array $filters): array
     {
+        $normalized = ReportFilters::normalize($filters);
+
         return [
-            'sede_id' => $this->normalizeSedeIds($filters['sede_id'] ?? null),
-            'date_from' => $filters['date_from'] ?? null,
-            'date_to' => $filters['date_to'] ?? null,
+            'sede_id' => $normalized['sede_id'],
+            'date_from' => $normalized['date_from'],
+            'date_to' => $normalized['date_to'],
             'option_type' => $filters['option_type'] ?? null,
             'rating_category' => $filters['rating_category'] ?? null,
         ];

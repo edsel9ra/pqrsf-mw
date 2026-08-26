@@ -11,7 +11,6 @@ use App\Services\Reports\ReportXlsxService;
 use App\Services\Reports\SubmissionReportService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class ReportController extends Controller
@@ -125,13 +124,12 @@ class ReportController extends Controller
             'rating_category' => 'nullable|string|in:ambientacion,atencion,comida,tiempo',
         ]);
 
-        if (array_key_exists('sede_id', $validated)) {
-            $validated['sede_id'] = collect(Arr::wrap($validated['sede_id']))
-                ->filter(fn ($sedeId): bool => filled($sedeId))
-                ->map(fn ($sedeId): int => (int) $sedeId)
-                ->unique()
-                ->values()
-                ->all() ?: null;
+        $normalized = ReportFilters::normalize($validated);
+
+        foreach (['sede_id', 'date_from', 'date_to'] as $filter) {
+            if (array_key_exists($filter, $validated)) {
+                $validated[$filter] = $normalized[$filter];
+            }
         }
 
         $this->validateDateRange($validated);
