@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\ReportPdfService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class ReportController extends Controller
@@ -23,13 +24,27 @@ class ReportController extends Controller
 
     protected function getValidatedFilters(Request $request): array
     {
+        if ($request->filled('sede_id') && ! is_array($request->input('sede_id'))) {
+            $request->merge(['sede_id' => [$request->input('sede_id')]]);
+        }
+
         $validated = $request->validate([
-            'sede_id' => 'nullable|integer|exists:sedes,id',
+            'sede_id' => ['nullable', 'array'],
+            'sede_id.*' => ['integer', 'distinct', 'exists:sedes,id'],
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
             'option_type' => 'nullable|string|in:Queja,Reclamo,Petición,Sugerencia,Felicitación',
             'rating_category' => 'nullable|string|in:ambientacion,atencion,comida,tiempo',
         ]);
+
+        if (array_key_exists('sede_id', $validated)) {
+            $validated['sede_id'] = collect(Arr::wrap($validated['sede_id']))
+                ->filter(fn ($sedeId): bool => filled($sedeId))
+                ->map(fn ($sedeId): int => (int) $sedeId)
+                ->unique()
+                ->values()
+                ->all() ?: null;
+        }
 
         $this->validateDateRange($validated);
 

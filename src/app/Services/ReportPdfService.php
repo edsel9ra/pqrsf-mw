@@ -9,7 +9,7 @@ class ReportPdfService
     public function getData(array $filters): array
     {
         $service = ReportService::make(
-            sedeId: $filters['sede_id'] ?? null,
+            sedeIds: $filters['sede_id'] ?? null,
             dateFrom: $filters['date_from'] ?? null,
             dateTo: $filters['date_to'] ?? null,
             optionType: $filters['option_type'] ?? null,

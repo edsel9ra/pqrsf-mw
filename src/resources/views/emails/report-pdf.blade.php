@@ -1,7 +1,7 @@
 <x-mail::message>
 # Reporte PQRSF
 
-Se adjunta el reporte consolidado correspondiente a **{{ $sedeName }}**.
+Se adjunta el reporte consolidado correspondiente a **{{ $scopeLabel }}**.
 
 **Generado:** {{ $generatedAt }}
 

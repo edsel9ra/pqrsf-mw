@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
@@ -58,6 +59,9 @@ class Reports extends Page implements HasForms
                     ->label('Sede')
                     ->placeholder('Todas las sedes')
                     ->options(fn () => Sede::orderBy('nombre')->pluck('nombre', 'id'))
+                    ->multiple()
+                    ->searchable()
+                    ->preload()
                     ->native(false),
                 DatePicker::make('filterData.date_from')
                     ->label('Desde')
@@ -96,12 +100,13 @@ class Reports extends Page implements HasForms
 
     public function generateReport(): void
     {
-        $filters = $this->getFormFilters();
+        $rawFilters = $this->getFormFilters();
 
-        if (! $this->filtersAreValid($filters)) {
+        if (! $this->filtersAreValid($rawFilters)) {
             return;
         }
 
+        $filters = $this->normalizeFilters($rawFilters);
         $this->appliedFilters = $filters;
         $this->reportData = app(ReportPdfService::class)->getData($filters);
         $this->showReport = true;
@@ -118,11 +123,19 @@ class Reports extends Page implements HasForms
             return;
         }
 
-        $sedeId = $this->appliedFilters['sede_id'] ?? null;
+        $rawFilters = $this->prepareFilters($this->appliedFilters);
 
-        if (! $sedeId) {
+        if (! $this->filtersAreValid($rawFilters)) {
+            return;
+        }
+
+        $filters = $this->normalizeFilters($rawFilters);
+        $this->appliedFilters = $filters;
+        $sedeIds = $filters['sede_id'];
+
+        if ($sedeIds === null) {
             Notification::make()
-                ->title('Seleccione una sede para enviar el reporte')
+                ->title('Seleccione al menos una sede para enviar el reporte')
                 ->body('Un reporte de todas las sedes no tiene un grupo único de destinatarios.')
                 ->danger()
                 ->send();
@@ -130,24 +143,78 @@ class Reports extends Page implements HasForms
             return;
         }
 
-        $sede = Sede::query()
+        $sedes = Sede::query()
+            ->whereIn('id', $sedeIds)
             ->with(['sedeRecipients' => fn ($query) => $query->where('activo', true)->orderBy('id')])
-            ->find($sedeId);
+            ->orderBy('nombre')
+            ->get();
 
-        if (! $sede) {
+        if ($sedes->count() !== count($sedeIds)) {
             Notification::make()
-                ->title('La sede seleccionada no está disponible')
+                ->title('Una o más sedes seleccionadas no están disponibles')
                 ->danger()
                 ->send();
 
             return;
         }
 
-        $recipients = $sede->sedeRecipients;
+        $sedesWithoutRecipients = $sedes
+            ->filter(fn (Sede $sede): bool => $sede->sedeRecipients->isEmpty())
+            ->pluck('nombre');
 
-        if ($recipients->isEmpty()) {
+        $sedesWithInvalidRecipients = $sedes
+            ->flatMap(fn (Sede $sede) => $sede->sedeRecipients
+                ->filter(fn ($recipient): bool => trim((string) $recipient->email) === '')
+                ->map(fn () => $sede->nombre))
+            ->unique()
+            ->values();
+
+        if ($sedesWithoutRecipients->isNotEmpty()) {
             Notification::make()
-                ->title('No hay destinatarios activos para esta sede')
+                ->title('No hay destinatarios activos para todas las sedes')
+                ->body('Configure destinatarios activos para: '.$sedesWithoutRecipients->implode(', ').'.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if ($sedesWithInvalidRecipients->isNotEmpty()) {
+            Notification::make()
+                ->title('Hay destinatarios activos sin correo electrónico')
+                ->body('Corrija los destinatarios de: '.$sedesWithInvalidRecipients->implode(', ').'.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $recipientGroups = [];
+        foreach ($sedes as $sede) {
+            foreach ($sede->sedeRecipients as $recipient) {
+                $email = strtolower(trim((string) $recipient->email));
+
+                if ($email === '') {
+                    continue;
+                }
+
+                $recipientGroups[$email] ??= [
+                    'email' => trim((string) $recipient->email),
+                    'name' => (string) $recipient->nombre,
+                    'sede_ids' => [],
+                    'sede_names' => [],
+                ];
+
+                if (! in_array($sede->id, $recipientGroups[$email]['sede_ids'], true)) {
+                    $recipientGroups[$email]['sede_ids'][] = $sede->id;
+                    $recipientGroups[$email]['sede_names'][] = $sede->nombre;
+                }
+            }
+        }
+
+        if ($recipientGroups === []) {
+            Notification::make()
+                ->title('No hay destinatarios activos para las sedes seleccionadas')
                 ->body('Configure al menos un destinatario activo antes de enviar el reporte.')
                 ->danger()
                 ->send();
@@ -155,38 +222,40 @@ class Reports extends Page implements HasForms
             return;
         }
 
-        try {
-            $report = app(ReportPdfService::class)->generate($this->appliedFilters);
-        } catch (Throwable $exception) {
-            report($exception);
-
-            Notification::make()
-                ->title('No se pudo generar el PDF')
-                ->body('Intente nuevamente o revise los filtros seleccionados.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
+        $reports = [];
         $sent = [];
         $failed = [];
 
-        foreach ($recipients as $recipient) {
+        foreach ($recipientGroups as $group) {
             try {
-                Mail::to($recipient->email, $recipient->nombre)
+                sort($group['sede_ids'], SORT_NUMERIC);
+                $scopeKey = implode(',', $group['sede_ids']);
+
+                if (! array_key_exists($scopeKey, $reports)) {
+                    $reports[$scopeKey] = app(ReportPdfService::class)->generate([
+                        ...$filters,
+                        'sede_id' => $group['sede_ids'],
+                    ]);
+                }
+
+                $report = $reports[$scopeKey];
+                $scopeLabel = count($group['sede_names']) === 1
+                    ? 'Sede: '.$group['sede_names'][0]
+                    : 'Sedes: '.implode(', ', $group['sede_names']);
+
+                Mail::to($group['email'], $group['name'])
                     ->send(new ReportPdfMail(
                         pdfContent: $report['content'],
                         filename: $report['filename'],
-                        sedeName: $sede->nombre,
+                        scopeLabel: $scopeLabel,
                         filterLabels: $report['data']['filterLabels'],
                         generatedAt: $report['data']['generatedAt'],
                     ));
 
-                $sent[] = $recipient->email;
+                $sent[] = $group['email'];
             } catch (Throwable $exception) {
                 report($exception);
-                $failed[] = $recipient->email;
+                $failed[] = $group['email'];
             }
         }
 
@@ -202,7 +271,7 @@ class Reports extends Page implements HasForms
 
         Notification::make()
             ->title('Reporte enviado correctamente')
-            ->body('Se envió a '.$recipients->count().' destinatario(s) de '.$sede->nombre.'.')
+            ->body('Se envió a '.count($sent).' destinatario(s) de '.count($sedeIds).' sede(s).')
             ->success()
             ->send();
     }
@@ -222,19 +291,20 @@ class Reports extends Page implements HasForms
         $state = $this->form->getState();
         $filters = $state['filterData'] ?? [];
 
-        return [
-            'sede_id' => filled($filters['sede_id'] ?? null) ? (int) $filters['sede_id'] : null,
+        return $this->prepareFilters([
+            'sede_id' => $filters['sede_id'] ?? null,
             'date_from' => $filters['date_from'] ?? null,
             'date_to' => $filters['date_to'] ?? null,
             'option_type' => $filters['option_type'] ?? null,
             'rating_category' => $filters['rating_category'] ?? null,
-        ];
+        ]);
     }
 
     protected function filtersAreValid(array $filters): bool
     {
         $validator = Validator::make($filters, [
-            'sede_id' => 'nullable|integer|exists:sedes,id',
+            'sede_id' => ['nullable', 'array'],
+            'sede_id.*' => ['integer', 'distinct', 'exists:sedes,id'],
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
             'option_type' => 'nullable|string|in:Queja,Reclamo,Petición,Sugerencia,Felicitación',
@@ -252,6 +322,49 @@ class Reports extends Page implements HasForms
         }
 
         return $this->dateRangeIsValid($filters);
+    }
+
+    protected function normalizeFilters(array $filters): array
+    {
+        return [
+            'sede_id' => $this->normalizeSedeIds($filters['sede_id'] ?? null),
+            'date_from' => $filters['date_from'] ?? null,
+            'date_to' => $filters['date_to'] ?? null,
+            'option_type' => $filters['option_type'] ?? null,
+            'rating_category' => $filters['rating_category'] ?? null,
+        ];
+    }
+
+    protected function prepareFilters(array $filters): array
+    {
+        return [
+            'sede_id' => $this->wrapSedeIds($filters['sede_id'] ?? null),
+            'date_from' => $filters['date_from'] ?? null,
+            'date_to' => $filters['date_to'] ?? null,
+            'option_type' => $filters['option_type'] ?? null,
+            'rating_category' => $filters['rating_category'] ?? null,
+        ];
+    }
+
+    protected function wrapSedeIds(mixed $value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Arr::wrap($value);
+    }
+
+    protected function normalizeSedeIds(mixed $value): ?array
+    {
+        $ids = collect(Arr::wrap($value))
+            ->filter(fn ($sedeId): bool => filled($sedeId))
+            ->map(fn ($sedeId): int => (int) $sedeId)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $ids !== [] ? $ids : null;
     }
 
     protected function dateRangeIsValid(array $filters): bool

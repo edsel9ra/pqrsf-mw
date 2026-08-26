@@ -127,7 +127,6 @@
 
         .metric-grid td,
         .rating-grid td {
-            width: 33.33%;
             padding: 9px 11px;
             border: 1px solid #e2d9cf;
             border-top: 3px solid #877568;
@@ -140,8 +139,8 @@
             border-left: 1px solid #e2d9cf;
         }
 
-        .metric-grid .pending {
-            border-top-color: #d49a3a;
+        .metric-grid td {
+            width: 50%;
         }
 
         .metric-grid .general {
@@ -155,10 +154,6 @@
             font-size: 19px;
             font-weight: bold;
             line-height: 1;
-        }
-
-        .pending .metric-value {
-            color: #b47718;
         }
 
         .general .metric-value {
@@ -407,10 +402,6 @@
                 <span class="metric-value">{{ $stats['total'] }}</span>
                 <span class="metric-label">Total PQRSF</span>
             </td>
-            <td class="pending">
-                <span class="metric-value">{{ $stats['pending'] }}</span>
-                <span class="metric-label">Pendientes</span>
-            </td>
             <td class="general">
                 <span class="metric-value">{{ number_format($stats['avg_general'], 1) }}/5</span>
                 <span class="metric-label">Promedio general</span>
@@ -435,37 +426,39 @@
     </table>
 </section>
 
-<section class="section">
-    <p class="section-eyebrow">Calidad percibida</p>
-    <h2 class="section-title">Calificaciones por sede</h2>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Sede</th>
-                <th class="text-center">Ambientación</th>
-                <th class="text-center">Atención</th>
-                <th class="text-center">Comida</th>
-                <th class="text-center">Tiempo</th>
-                <th class="text-center">Promedio</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($ratingsBySede as $sede)
+@if ($showRatingComparison ?? false)
+    <section class="section">
+        <p class="section-eyebrow">Comparativo</p>
+        <h2 class="section-title">Calificaciones por sede</h2>
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <td><strong>{{ $sede->sede_nombre }}</strong></td>
-                    @foreach (['ambientacion', 'atencion', 'comida', 'tiempo'] as $field)
-                        <td class="text-center">
-                            <span class="score {{ $scoreClass($sede->$field) }}">{{ number_format($sede->$field, 1) }}</span>
-                        </td>
-                    @endforeach
-                    <td class="text-center"><strong>{{ number_format($sede->promedio, 1) }}</strong></td>
+                    <th>Sede</th>
+                    <th class="text-center">Ambientación</th>
+                    <th class="text-center">Atención</th>
+                    <th class="text-center">Comida</th>
+                    <th class="text-center">Tiempo</th>
+                    <th class="text-center">Promedio</th>
                 </tr>
-            @empty
-                <tr><td colspan="6" class="text-center">Sin datos para los filtros seleccionados.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
-</section>
+            </thead>
+            <tbody>
+                @forelse ($ratingsBySede as $sede)
+                    <tr>
+                        <td><strong>{{ $sede->sede_nombre }}</strong></td>
+                        @foreach (['ambientacion', 'atencion', 'comida', 'tiempo'] as $field)
+                            <td class="text-center">
+                                <span class="score {{ $scoreClass($sede->$field) }}">{{ number_format($sede->$field, 1) }}</span>
+                            </td>
+                        @endforeach
+                        <td class="text-center"><strong>{{ number_format($sede->promedio, 1) }}</strong></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="text-center">Sin datos para los filtros seleccionados.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </section>
+@endif
 
 @if (! empty($pqrsfBySede) && $pqrsfBySede->isNotEmpty())
     @php $bySedeOptions = ['Felicitación', 'Queja', 'Reclamo', 'Sugerencia', 'Petición']; @endphp
@@ -497,7 +490,7 @@
     </section>
 @endif
 
-@if (! empty($ratingPercentagesBySede) && $ratingPercentagesBySede->isNotEmpty())
+@if (($showRatingComparison ?? false) && ! empty($ratingPercentagesBySede) && $ratingPercentagesBySede->isNotEmpty())
     @php $percentageOptions = ['atencion' => 'Atención a la Mesa', 'comida' => 'Calidad de la Comida', 'tiempo' => 'Tiempo de Entrega', 'ambientacion' => 'Ambientación']; @endphp
     <section class="section">
         <p class="section-eyebrow">Indicadores de cumplimiento</p>

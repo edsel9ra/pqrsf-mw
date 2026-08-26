@@ -7,12 +7,13 @@ use App\Models\Sede;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ReportService
 {
-    protected ?int $sedeId;
+    protected ?array $sedeIds;
 
     protected ?string $dateFrom;
 
@@ -23,13 +24,18 @@ class ReportService
     protected ?string $ratingCategory;
 
     public function __construct(
-        ?int $sedeId = null,
+        array|int|string|null $sedeIds = null,
         ?string $dateFrom = null,
         ?string $dateTo = null,
         ?string $optionType = null,
         ?string $ratingCategory = null,
     ) {
-        $this->sedeId = $sedeId;
+        $this->sedeIds = collect(Arr::wrap($sedeIds))
+            ->filter(fn ($sedeId): bool => filled($sedeId))
+            ->map(fn ($sedeId): int => (int) $sedeId)
+            ->unique()
+            ->values()
+            ->all() ?: null;
         $this->dateFrom = $dateFrom;
         $this->dateTo = $dateTo;
         $this->optionType = $optionType;
@@ -37,21 +43,21 @@ class ReportService
     }
 
     public static function make(
-        ?int $sedeId = null,
+        array|int|string|null $sedeIds = null,
         ?string $dateFrom = null,
         ?string $dateTo = null,
         ?string $optionType = null,
         ?string $ratingCategory = null,
     ): self {
-        return new self($sedeId, $dateFrom, $dateTo, $optionType, $ratingCategory);
+        return new self($sedeIds, $dateFrom, $dateTo, $optionType, $ratingCategory);
     }
 
     public function baseQuery(): Builder
     {
         $query = PqrsfSubmission::query();
 
-        if ($this->sedeId) {
-            $query->where('sede_id', $this->sedeId);
+        if ($this->sedeIds !== null) {
+            $query->whereIn('sede_id', $this->sedeIds);
         }
         if ($this->dateFrom) {
             $query->whereDate('created_at', '>=', $this->dateFrom);
@@ -72,7 +78,7 @@ class ReportService
     public function getFilterParams(): array
     {
         return [
-            'sede_id' => $this->sedeId,
+            'sede_id' => $this->sedeIds,
             'date_from' => $this->dateFrom,
             'date_to' => $this->dateTo,
             'option_type' => $this->optionType,
@@ -84,7 +90,6 @@ class ReportService
     {
         $base = $this->baseQuery();
         $total = (clone $base)->count();
-        $pending = (clone $base)->where('status', 'pending')->count();
 
         $ratings = (clone $base)->select(
             DB::raw('ROUND(AVG(JSON_EXTRACT(field_values, "$.calificacion_ambientacion")), 1) as ambientacion'),
@@ -99,7 +104,6 @@ class ReportService
 
         return [
             'total' => $total,
-            'pending' => $pending,
             'avg_ambientacion' => $ratings?->ambientacion ?? 0,
             'avg_atencion' => $ratings?->atencion ?? 0,
             'avg_comida' => $ratings?->comida ?? 0,
@@ -111,9 +115,7 @@ class ReportService
     public function getRatingsBySede(): Collection
     {
         $base = $this->baseQuery();
-        $sedes = Sede::when($this->sedeId, fn ($q) => $q->where('id', $this->sedeId))
-            ->orderBy('nombre')
-            ->pluck('nombre', 'id');
+        $sedes = $this->getReportSedes()->pluck('nombre', 'id');
 
         $rows = (clone $base)
             ->select(
@@ -277,9 +279,14 @@ class ReportService
     public function getFilterLabels(): array
     {
         $parts = [];
-        if ($this->sedeId) {
-            $sede = Sede::find($this->sedeId);
-            $parts[] = 'Sede: '.($sede?->nombre ?? 'N/A');
+        if ($this->sedeIds !== null) {
+            $sedeNames = $this->getReportSedes()->pluck('nombre')->all();
+
+            if (count($sedeNames) === 1) {
+                $parts[] = 'Sede: '.$sedeNames[0];
+            } elseif ($sedeNames !== []) {
+                $parts[] = 'Sedes: '.implode(', ', $sedeNames);
+            }
         }
         if ($this->dateFrom) {
             $parts[] = 'Desde: '.Carbon::parse($this->dateFrom)->format('d/m/Y');
@@ -305,9 +312,7 @@ class ReportService
     public function getPqrsfBySede(): Collection
     {
         $base = $this->baseQuery();
-        $sedes = Sede::when($this->sedeId, fn ($q) => $q->where('id', $this->sedeId))
-            ->orderBy('nombre')
-            ->pluck('nombre', 'id');
+        $sedes = $this->getReportSedes()->pluck('nombre', 'id');
 
         $options = ['Felicitación', 'Queja', 'Reclamo', 'Sugerencia', 'Petición'];
 
@@ -381,8 +386,15 @@ class ReportService
         return $result;
     }
 
+    public function getComparisonSedeCount(): int
+    {
+        return $this->getReportSedes()->count();
+    }
+
     public function getAll(): array
     {
+        $comparisonSedeCount = $this->getComparisonSedeCount();
+
         return [
             'filters' => $this->getFilterParams(),
             'filterLabels' => $this->getFilterLabels(),
@@ -393,7 +405,17 @@ class ReportService
             'ratingAverages' => $this->getRatingAveragesByCategory(),
             'pqrsfBySede' => $this->getPqrsfBySede(),
             'ratingPercentagesBySede' => $this->getRatingPercentagesBySede(),
+            'comparisonSedeCount' => $comparisonSedeCount,
+            'showRatingComparison' => $comparisonSedeCount >= 2,
             'generatedAt' => now()->format('d/m/Y H:i:s'),
         ];
+    }
+
+    protected function getReportSedes(): Collection
+    {
+        return Sede::query()
+            ->when($this->sedeIds !== null, fn ($query) => $query->whereIn('id', $this->sedeIds))
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
     }
 }

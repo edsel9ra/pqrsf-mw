@@ -16,7 +16,7 @@ class ReportPdfMail extends Mailable
     public function __construct(
         public string $pdfContent,
         public string $filename,
-        public string $sedeName,
+        public string $scopeLabel,
         public array $filterLabels,
         public string $generatedAt,
     ) {}
@@ -24,7 +24,7 @@ class ReportPdfMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Reporte PQRSF - '.$this->sedeName,
+            subject: 'Reporte PQRSF - '.$this->scopeLabel,
         );
     }
 

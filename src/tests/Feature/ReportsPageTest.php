@@ -95,6 +95,33 @@ class ReportsPageTest extends TestCase
         $this->assertSame('%PDF-1.7 test', $response->getContent());
     }
 
+    public function test_pdf_download_accepts_multiple_sedes(): void
+    {
+        $user = User::first();
+        $sedes = Sede::factory()->count(2)->create();
+        $filters = [
+            'sede_id' => $sedes->pluck('id')->all(),
+            'date_from' => '2026-01-01',
+            'date_to' => '2026-01-31',
+        ];
+
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldReceive('generate')
+            ->once()
+            ->with($filters)
+            ->andReturn([
+                'content' => '%PDF-1.7 multi-sede',
+                'data' => [],
+                'filename' => 'reporte-pqrsf-2026-01-31.pdf',
+            ]);
+        $this->app->instance(ReportPdfService::class, $pdfService);
+
+        $response = $this->actingAs($user)->get('/admin/reportes/pdf?'.http_build_query($filters));
+
+        $response->assertOk();
+        $this->assertSame('%PDF-1.7 multi-sede', $response->getContent());
+    }
+
     public function test_report_pdf_does_not_include_removed_status_sections(): void
     {
         $reportData = $this->emptyReportData();
@@ -111,9 +138,38 @@ class ReportsPageTest extends TestCase
 
         $this->assertStringNotContainsString('Validados', $html);
         $this->assertStringNotContainsString('Enviados', $html);
+        $this->assertStringNotContainsString('Pendientes', $html);
         $this->assertStringNotContainsString('Distribución por estado', $html);
         $this->assertStringNotContainsString('Distribución por Estado', $html);
         $this->assertStringContainsString('Distribución por opción', $html);
+    }
+
+    public function test_report_pdf_only_shows_sede_comparison_for_multiple_sedes(): void
+    {
+        $reportData = $this->emptyReportData();
+        $reportData['ratingsBySede'] = collect([(object) [
+            'sede_nombre' => 'Sede Principal',
+            'ambientacion' => 4,
+            'atencion' => 4,
+            'comida' => 4,
+            'tiempo' => 4,
+            'promedio' => 4,
+        ]]);
+
+        $html = view('reports.pdf', [
+            ...$reportData,
+            'logoSrc' => '',
+        ])->render();
+
+        $this->assertStringNotContainsString('Calificaciones por sede', $html);
+
+        $reportData['showRatingComparison'] = true;
+        $html = view('reports.pdf', [
+            ...$reportData,
+            'logoSrc' => '',
+        ])->render();
+
+        $this->assertStringContainsString('Calificaciones por sede', $html);
     }
 
     public function test_report_email_contains_filters_and_pdf_attachment(): void
@@ -121,7 +177,7 @@ class ReportsPageTest extends TestCase
         $mail = new ReportPdfMail(
             pdfContent: '%PDF-1.7 report',
             filename: 'reporte-pqrsf-2026-08-25.pdf',
-            sedeName: 'Sede Principal',
+            scopeLabel: 'Sede: Sede Principal',
             filterLabels: ['Sede: Sede Principal', 'Desde: 01/08/2026'],
             generatedAt: '25/08/2026 10:00:00',
         );
@@ -147,17 +203,43 @@ class ReportsPageTest extends TestCase
             ->call('generateReport')
             ->assertSet('showReport', true)
             ->assertSee('Resumen PQRSF')
+            ->assertDontSee('Pendientes')
             ->assertDontSee('Validados')
             ->assertDontSee('Enviados')
             ->assertDontSee('Distribución por estado')
             ->assertDontSee('Distribución por Estado');
     }
 
+    public function test_report_screen_hides_sede_comparison_for_a_single_sede(): void
+    {
+        $reportData = $this->emptyReportData();
+        $reportData['ratingsBySede'] = collect([(object) [
+            'sede_nombre' => 'Sede Principal',
+            'ambientacion' => 4,
+            'atencion' => 4,
+            'comida' => 4,
+            'tiempo' => 4,
+            'promedio' => 4,
+        ]]);
+
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldReceive('getData')
+            ->once()
+            ->andReturn($reportData);
+        $this->app->instance(ReportPdfService::class, $pdfService);
+
+        Livewire::actingAs(User::first())
+            ->test(Reports::class)
+            ->call('generateReport')
+            ->assertSee('Resumen PQRSF')
+            ->assertDontSee('Calificaciones por sede');
+    }
+
     public function test_generated_report_keeps_the_applied_filters_for_export(): void
     {
         $sede = Sede::first();
         $filters = [
-            'sede_id' => $sede->id,
+            'sede_id' => [$sede->id],
             'date_from' => '2026-01-01',
             'date_to' => '2026-01-31',
             'option_type' => 'Queja',
@@ -174,7 +256,7 @@ class ReportsPageTest extends TestCase
         Livewire::actingAs(User::first())
             ->test(Reports::class)
             ->fillForm([
-                'filterData.sede_id' => $sede->id,
+                'filterData.sede_id' => [$sede->id],
                 'filterData.date_from' => '2026-01-01',
                 'filterData.date_to' => '2026-01-31',
                 'filterData.option_type' => 'Queja',
@@ -226,7 +308,7 @@ class ReportsPageTest extends TestCase
         Livewire::actingAs($user)
             ->test(Reports::class)
             ->set('reportData', $this->emptyReportData())
-            ->set('appliedFilters', ['sede_id' => $selectedSede->id])
+            ->set('appliedFilters', ['sede_id' => [$selectedSede->id]])
             ->set('showReport', true)
             ->call('sendReport')
             ->assertHasNoErrors();
@@ -240,6 +322,81 @@ class ReportsPageTest extends TestCase
         });
         Mail::assertNotSent(ReportPdfMail::class, function (ReportPdfMail $mail) use ($inactiveRecipient, $otherRecipient): bool {
             return $mail->hasTo($inactiveRecipient->email) || $mail->hasTo($otherRecipient->email);
+        });
+    }
+
+    public function test_report_sends_one_consolidated_pdf_per_email_for_assigned_sedes(): void
+    {
+        Mail::fake();
+
+        $user = User::first();
+        $firstSede = Sede::factory()->create(['nombre' => 'Sede A']);
+        $secondSede = Sede::factory()->create(['nombre' => 'Sede B']);
+
+        SedeRecipient::create([
+            'sede_id' => $firstSede->id,
+            'email' => 'shared@example.com',
+            'nombre' => 'Destinatario Compartido',
+            'activo' => true,
+        ]);
+        SedeRecipient::create([
+            'sede_id' => $secondSede->id,
+            'email' => ' SHARED@example.com ',
+            'nombre' => 'Destinatario Compartido',
+            'activo' => true,
+        ]);
+        SedeRecipient::create([
+            'sede_id' => $secondSede->id,
+            'email' => 'sede-b@example.com',
+            'nombre' => 'Destinatario Sede B',
+            'activo' => true,
+        ]);
+
+        $generatedScopes = [];
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldReceive('generate')
+            ->twice()
+            ->andReturnUsing(function (array $filters) use (&$generatedScopes): array {
+                $scope = array_map('intval', $filters['sede_id']);
+                sort($scope, SORT_NUMERIC);
+                $generatedScopes[] = $scope;
+
+                return [
+                    'content' => 'pdf-'.implode('-', $scope),
+                    'data' => [
+                        'filterLabels' => [],
+                        'generatedAt' => '25/08/2026 10:00:00',
+                    ],
+                    'filename' => 'reporte-pqrsf-2026-08-25.pdf',
+                ];
+            });
+        $this->app->instance(ReportPdfService::class, $pdfService);
+
+        Livewire::actingAs($user)
+            ->test(Reports::class)
+            ->set('reportData', $this->emptyReportData())
+            ->set('appliedFilters', ['sede_id' => [$firstSede->id, $secondSede->id]])
+            ->set('showReport', true)
+            ->call('sendReport')
+            ->assertHasNoErrors();
+
+        sort($generatedScopes[0], SORT_NUMERIC);
+        sort($generatedScopes[1], SORT_NUMERIC);
+        $this->assertEqualsCanonicalizing([
+            [$firstSede->id, $secondSede->id],
+            [$secondSede->id],
+        ], $generatedScopes);
+
+        Mail::assertSent(ReportPdfMail::class, 2);
+        Mail::assertSent(ReportPdfMail::class, function (ReportPdfMail $mail) use ($firstSede, $secondSede): bool {
+            return $mail->hasTo('shared@example.com')
+                && $mail->scopeLabel === 'Sedes: Sede A, Sede B'
+                && $mail->pdfContent === 'pdf-'.$firstSede->id.'-'.$secondSede->id;
+        });
+        Mail::assertSent(ReportPdfMail::class, function (ReportPdfMail $mail) use ($secondSede): bool {
+            return $mail->hasTo('sede-b@example.com')
+                && $mail->scopeLabel === 'Sede: Sede B'
+                && $mail->pdfContent === 'pdf-'.$secondSede->id;
         });
     }
 
@@ -281,7 +438,68 @@ class ReportsPageTest extends TestCase
         Livewire::actingAs(User::first())
             ->test(Reports::class)
             ->set('reportData', $this->emptyReportData())
-            ->set('appliedFilters', ['sede_id' => $sede->id])
+            ->set('appliedFilters', ['sede_id' => [$sede->id]])
+            ->set('showReport', true)
+            ->call('sendReport')
+            ->assertHasNoErrors();
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_report_email_blocks_when_any_selected_sede_has_no_active_recipients(): void
+    {
+        Mail::fake();
+
+        $firstSede = Sede::factory()->create();
+        $secondSede = Sede::factory()->create();
+        SedeRecipient::create([
+            'sede_id' => $firstSede->id,
+            'email' => 'activo@example.com',
+            'nombre' => 'Destinatario Activo',
+            'activo' => true,
+        ]);
+        SedeRecipient::create([
+            'sede_id' => $secondSede->id,
+            'email' => 'inactivo@example.com',
+            'nombre' => 'Destinatario Inactivo',
+            'activo' => false,
+        ]);
+
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldNotReceive('generate');
+        $this->app->instance(ReportPdfService::class, $pdfService);
+
+        Livewire::actingAs(User::first())
+            ->test(Reports::class)
+            ->set('reportData', $this->emptyReportData())
+            ->set('appliedFilters', ['sede_id' => [$firstSede->id, $secondSede->id]])
+            ->set('showReport', true)
+            ->call('sendReport')
+            ->assertHasNoErrors();
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_report_email_blocks_active_recipients_without_an_email(): void
+    {
+        Mail::fake();
+
+        $sede = Sede::factory()->create();
+        SedeRecipient::create([
+            'sede_id' => $sede->id,
+            'email' => '   ',
+            'nombre' => 'Destinatario Inválido',
+            'activo' => true,
+        ]);
+
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldNotReceive('generate');
+        $this->app->instance(ReportPdfService::class, $pdfService);
+
+        Livewire::actingAs(User::first())
+            ->test(Reports::class)
+            ->set('reportData', $this->emptyReportData())
+            ->set('appliedFilters', ['sede_id' => [$sede->id]])
             ->set('showReport', true)
             ->call('sendReport')
             ->assertHasNoErrors();
@@ -299,7 +517,26 @@ class ReportsPageTest extends TestCase
 
         $this->assertArrayNotHasKey('validated', $data['stats']);
         $this->assertArrayNotHasKey('sent', $data['stats']);
+        $this->assertArrayNotHasKey('pending', $data['stats']);
         $this->assertArrayNotHasKey('statusDistribution', $data);
+    }
+
+    public function test_report_service_normalizes_multiple_sede_filters_and_labels(): void
+    {
+        $sedes = Sede::factory()->createMany([
+            ['nombre' => 'Sede A'],
+            ['nombre' => 'Sede B'],
+        ]);
+
+        $service = ReportService::make([
+            $sedes[1]->id,
+            $sedes[0]->id,
+            $sedes[1]->id,
+        ]);
+
+        $this->assertSame([$sedes[1]->id, $sedes[0]->id], $service->getFilterParams()['sede_id']);
+        $this->assertSame(['Sedes: Sede A, Sede B'], $service->getFilterLabels());
+        $this->assertSame(2, $service->getComparisonSedeCount());
     }
 
     private function emptyReportData(): array
@@ -309,7 +546,6 @@ class ReportsPageTest extends TestCase
             'filterLabels' => [],
             'stats' => [
                 'total' => 0,
-                'pending' => 0,
                 'avg_ambientacion' => 0,
                 'avg_atencion' => 0,
                 'avg_comida' => 0,
@@ -322,6 +558,8 @@ class ReportsPageTest extends TestCase
             'ratingAverages' => [],
             'pqrsfBySede' => collect(),
             'ratingPercentagesBySede' => collect(),
+            'comparisonSedeCount' => 0,
+            'showRatingComparison' => false,
             'generatedAt' => '25/08/2026 10:00:00',
         ];
     }

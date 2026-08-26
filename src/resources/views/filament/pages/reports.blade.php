@@ -156,8 +156,6 @@
         }
 
         .pqrs-report-stat.total { color: #334155; }
-        .pqrs-report-stat.pending { color: var(--pqrs-amber); }
-
         .pqrs-report-stat-label {
             display: block;
             color: var(--pqrs-muted);
@@ -554,7 +552,7 @@
                         <x-filament::button tag="a" href="{{ $this->getDownloadUrl('pdf') }}" icon="heroicon-o-document-arrow-down" color="danger" target="_blank">
                             Descargar PDF
                         </x-filament::button>
-                        <x-filament::button type="button" wire:click="sendReport" wire:confirm="¿Enviar este reporte a los destinatarios activos de la sede seleccionada?" icon="heroicon-o-envelope" color="success">
+                        <x-filament::button type="button" wire:click="sendReport" wire:confirm="¿Enviar este reporte a los destinatarios activos de las sedes seleccionadas?" icon="heroicon-o-envelope" color="success">
                             Enviar por correo
                         </x-filament::button>
                     </div>
@@ -565,11 +563,6 @@
                         <span class="pqrs-report-stat-label">Total PQRSF</span>
                         <strong class="pqrs-report-stat-value">{{ $stats['total'] }}</strong>
                         <span class="pqrs-report-stat-note">Solicitudes del periodo</span>
-                    </article>
-                    <article class="pqrs-report-stat pending">
-                        <span class="pqrs-report-stat-label">Pendientes</span>
-                        <strong class="pqrs-report-stat-value">{{ $stats['pending'] }}</strong>
-                        <span class="pqrs-report-stat-note">Por validar</span>
                     </article>
                 </div>
 
@@ -605,7 +598,7 @@
                     </div>
                 </section>
 
-                @if ($reportData['ratingsBySede']->isNotEmpty())
+                @if (($reportData['showRatingComparison'] ?? false) && $reportData['ratingsBySede']->isNotEmpty())
                     <section class="pqrs-report-table-card">
                         <div class="pqrs-report-section-head">
                             <div>
@@ -679,7 +672,7 @@
                     </section>
                 @endif
 
-                @if (! empty($reportData['ratingPercentagesBySede']) && $reportData['ratingPercentagesBySede']->isNotEmpty())
+                @if (($reportData['showRatingComparison'] ?? false) && ! empty($reportData['ratingPercentagesBySede']) && $reportData['ratingPercentagesBySede']->isNotEmpty())
                     @php
                         $pctOptions = ['atencion' => 'Atención a la Mesa', 'comida' => 'Calidad de la Comida', 'tiempo' => 'Tiempo de Entrega', 'ambientacion' => 'Ambientación'];
                     @endphp
