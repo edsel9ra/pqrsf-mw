@@ -3,7 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\ReportFilters;
 use App\Services\ReportPdfService;
+use App\Services\Reports\ObservationsReportService;
+use App\Services\Reports\ReportPdfService as DetailedReportPdfService;
+use App\Services\Reports\ReportXlsxService;
+use App\Services\Reports\SubmissionReportService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -20,6 +25,89 @@ class ReportController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$report['filename'].'"',
         ]);
+    }
+
+    public function submissionsPdf(
+        Request $request,
+        SubmissionReportService $reportService,
+        DetailedReportPdfService $pdfService,
+    ) {
+        $filters = $this->getValidatedDetailFilters($request);
+        $report = $pdfService->generate(
+            'reports.submission-report-pdf',
+            $reportService->getData($filters),
+            $this->filename('registros', 'pdf'),
+        );
+
+        return $this->binaryDownload($report, 'application/pdf');
+    }
+
+    public function submissionsXlsx(
+        Request $request,
+        SubmissionReportService $reportService,
+        ReportXlsxService $xlsxService,
+    ) {
+        $filters = $this->getValidatedDetailFilters($request);
+        $data = $reportService->getData($filters);
+        $rows = $data['rows']->map(fn (array $row): array => [
+            $row['fecha'],
+            $row['sede'],
+            $row['nombre_completo'],
+            $row['nombre_mesero'],
+        ]);
+        $report = $xlsxService->generate(
+            ['Fecha', 'Sede', 'Nombre Completo', 'Nombre de Mesero'],
+            $rows,
+            $this->filename('registros', 'xlsx'),
+        );
+
+        return $this->binaryDownload(
+            $report,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+    }
+
+    public function observationsPdf(
+        Request $request,
+        ObservationsReportService $reportService,
+        DetailedReportPdfService $pdfService,
+    ) {
+        $filters = $this->getValidatedDetailFilters($request);
+        $report = $pdfService->generate(
+            'reports.observations-report-pdf',
+            $reportService->getData($filters),
+            $this->filename('observaciones', 'pdf'),
+        );
+
+        return $this->binaryDownload($report, 'application/pdf');
+    }
+
+    public function observationsXlsx(
+        Request $request,
+        ObservationsReportService $reportService,
+        ReportXlsxService $xlsxService,
+    ) {
+        $filters = $this->getValidatedDetailFilters($request);
+        $data = $reportService->getData($filters);
+        $rows = $data['groups']
+            ->flatMap(fn (array $group) => $group['rows'])
+            ->map(fn (array $row): array => [
+                $row['sede'],
+                $row['nombre_completo'],
+                $row['opcion_calificada'],
+                $row['observaciones'],
+                $row['nombre_mesero'],
+            ]);
+        $report = $xlsxService->generate(
+            ['Sede', 'Nombre Completo', 'Opción Calificada', 'Observaciones', 'Nombre de Mesero'],
+            $rows,
+            $this->filename('observaciones', 'xlsx'),
+        );
+
+        return $this->binaryDownload(
+            $report,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
     }
 
     protected function getValidatedFilters(Request $request): array
@@ -49,6 +137,24 @@ class ReportController extends Controller
         $this->validateDateRange($validated);
 
         return $validated;
+    }
+
+    protected function getValidatedDetailFilters(Request $request): array
+    {
+        return ReportFilters::validate($request->all());
+    }
+
+    private function binaryDownload(array $report, string $contentType)
+    {
+        return response($report['content'], 200, [
+            'Content-Type' => $contentType,
+            'Content-Disposition' => 'attachment; filename="'.$report['filename'].'"',
+        ]);
+    }
+
+    private function filename(string $type, string $extension): string
+    {
+        return 'reporte-'.$type.'-pqrsf-'.now()->format('Y-m-d').'.'.$extension;
     }
 
     protected function validateDateRange(array $filters): void

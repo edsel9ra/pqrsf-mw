@@ -14,7 +14,7 @@
             width: 100%;
             min-width: 0;
             max-width: 100%;
-            overflow-x: hidden;
+            overflow: visible;
         }
 
         .pqrs-report-page *,

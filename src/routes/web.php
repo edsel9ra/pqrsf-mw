@@ -21,4 +21,8 @@ Route::get('/pqrsf-submissions/{submission}/pdf', [PqrsfSubmissionPdfController:
 
 Route::middleware(['web', 'auth', 'can:access-admin'])->prefix('admin/reportes')->name('admin.reportes.')->group(function () {
     Route::get('/pdf', [ReportController::class, 'pdf'])->name('pdf');
+    Route::get('/registros/pdf', [ReportController::class, 'submissionsPdf'])->name('registros.pdf');
+    Route::get('/registros/xlsx', [ReportController::class, 'submissionsXlsx'])->name('registros.xlsx');
+    Route::get('/observaciones/pdf', [ReportController::class, 'observationsPdf'])->name('observaciones.pdf');
+    Route::get('/observaciones/xlsx', [ReportController::class, 'observationsXlsx'])->name('observaciones.xlsx');
 });
