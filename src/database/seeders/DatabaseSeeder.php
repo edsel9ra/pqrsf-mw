@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             FormFieldSeeder::class,
             SedeSeeder::class,
+            SedeComplaintRecipientSeeder::class,
             PqrsfSubmissionSeeder::class,
         ]);
     }

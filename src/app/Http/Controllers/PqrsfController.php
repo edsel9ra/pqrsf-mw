@@ -6,9 +6,14 @@ use App\Http\Requests\StorePqrsfRequest;
 use App\Models\PqrsfSubmission;
 use App\Models\Sede;
 use App\Services\FormFieldService;
+use App\Services\PqrsfComplaintNotificationService;
 
 class PqrsfController extends Controller
 {
+    public function __construct(
+        private readonly PqrsfComplaintNotificationService $complaintNotificationService,
+    ) {}
+
     public function create()
     {
         $sedes = Sede::where('activo', true)->orderBy('nombre')->get();
@@ -21,13 +26,15 @@ class PqrsfController extends Controller
     {
         $data = $request->normalizedData();
 
-        PqrsfSubmission::create([
+        $submission = PqrsfSubmission::create([
             'sede_id' => $data['sede_id'],
             'field_values' => $data,
             'status' => 'pending',
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
         ]);
+
+        $this->complaintNotificationService->sendIfComplaint($submission);
 
         return redirect()->route('pqrsf.gracias');
     }

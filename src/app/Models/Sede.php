@@ -34,4 +34,9 @@ class Sede extends Model
     {
         return $this->hasMany(SedeRecipient::class);
     }
+
+    public function complaintRecipients(): HasMany
+    {
+        return $this->hasMany(SedeComplaintRecipient::class);
+    }
 }

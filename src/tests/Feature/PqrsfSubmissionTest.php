@@ -2,11 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Mail\PqrsfSubmissionMail;
 use App\Models\FormField;
 use App\Models\PqrsfSubmission;
 use App\Models\Sede;
+use App\Models\SedeComplaintRecipient;
+use App\Models\SedeRecipient;
 use Database\Seeders\FormFieldSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class PqrsfSubmissionTest extends TestCase
@@ -64,6 +69,8 @@ class PqrsfSubmissionTest extends TestCase
 
     public function test_valid_submission_creates_record(): void
     {
+        Mail::fake();
+
         $response = $this->post('/pqrsf', [
             'sede_id' => 1,
             'nombre_completo' => 'Juan Pérez',
@@ -97,6 +104,84 @@ class PqrsfSubmissionTest extends TestCase
         $this->assertTrue($submission->field_values['recomendaria']);
         $this->assertTrue($submission->field_values['autorizacion_datos']);
         $this->assertIsArray($submission->field_values['medio_conocimiento']);
+    }
+
+    public function test_complaint_is_sent_to_active_complaint_recipients(): void
+    {
+        Mail::fake();
+
+        Sede::findOrFail(1)->update(['nombre' => 'Mister Wings Bochalema']);
+        SedeRecipient::create([
+            'sede_id' => 1,
+            'email' => 'recipient-from-other-flow@example.com',
+            'nombre' => 'Destinatario del flujo administrativo',
+            'activo' => true,
+        ]);
+        SedeComplaintRecipient::create([
+            'sede_id' => 1,
+            'email' => 'director.franquicias@misterwings.com',
+            'activo' => true,
+        ]);
+        SedeComplaintRecipient::create([
+            'sede_id' => 1,
+            'email' => 'director.administrativosedes@misterwings.com',
+            'activo' => true,
+        ]);
+        SedeComplaintRecipient::create([
+            'sede_id' => 1,
+            'email' => 'inactive@misterwings.com',
+            'activo' => false,
+        ]);
+
+        $response = $this->post('/pqrsf', $this->validPayload());
+
+        $response->assertRedirect('/pqrsf/gracias');
+        Mail::assertSent(PqrsfSubmissionMail::class, 2);
+        Mail::assertSent(PqrsfSubmissionMail::class, function (PqrsfSubmissionMail $mail): bool {
+            return $mail->hasTo('director.franquicias@misterwings.com');
+        });
+        Mail::assertSent(PqrsfSubmissionMail::class, function (PqrsfSubmissionMail $mail): bool {
+            return $mail->hasTo('director.administrativosedes@misterwings.com');
+        });
+        Mail::assertNotSent(PqrsfSubmissionMail::class, function (PqrsfSubmissionMail $mail): bool {
+            return $mail->hasTo('recipient-from-other-flow@example.com')
+                || $mail->hasTo('inactive@misterwings.com');
+        });
+    }
+
+    public function test_non_complaint_submission_does_not_send_email(): void
+    {
+        Mail::fake();
+
+        Sede::findOrFail(1)->update(['nombre' => 'Mister Wings Bochalema']);
+        SedeComplaintRecipient::create([
+            'sede_id' => 1,
+            'email' => 'director.franquicias@misterwings.com',
+            'activo' => true,
+        ]);
+
+        $response = $this->post('/pqrsf', $this->validPayload([
+            'opcion_a_calificar' => 'Petición',
+        ]));
+
+        $response->assertRedirect('/pqrsf/gracias');
+        Mail::assertNothingSent();
+    }
+
+    public function test_complaint_without_recipients_is_saved_and_logged(): void
+    {
+        Mail::fake();
+        Log::spy();
+
+        $response = $this->post('/pqrsf', $this->validPayload());
+
+        $response->assertRedirect('/pqrsf/gracias');
+        $this->assertDatabaseHas('pqrsf_submissions', [
+            'sede_id' => 1,
+            'status' => 'pending',
+        ]);
+        Mail::assertNothingSent();
+        Log::shouldHaveReceived('warning')->once();
     }
 
     public function test_authorization_data_can_be_declined(): void
