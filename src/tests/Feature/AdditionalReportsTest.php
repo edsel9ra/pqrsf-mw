@@ -175,6 +175,55 @@ class AdditionalReportsTest extends TestCase
         $this->assertSame('xlsx-filtered', $response->getContent());
     }
 
+    public function test_observations_pdf_export_applies_date_and_sede_filters(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $selectedSede = Sede::factory()->create(['nombre' => 'Sede Seleccionada']);
+        $otherSede = Sede::factory()->create(['nombre' => 'Otra Sede']);
+
+        $this->createSubmission($selectedSede, '2026-01-15 09:00:00', [
+            'nombre_completo' => 'Observación Incluida',
+            'observaciones' => 'Debe aparecer',
+        ]);
+        $this->createSubmission($selectedSede, '2026-02-15 09:00:00', [
+            'nombre_completo' => 'Observación Fuera de Fecha',
+            'observaciones' => 'No debe aparecer',
+        ]);
+        $this->createSubmission($otherSede, '2026-01-15 09:00:00', [
+            'nombre_completo' => 'Observación de Otra Sede',
+            'observaciones' => 'No debe aparecer',
+        ]);
+
+        $filters = [
+            'sede_id' => [$selectedSede->id],
+            'date_from' => '2026-01-01',
+            'date_to' => '2026-01-31',
+        ];
+        $pdfService = Mockery::mock(DetailedReportPdfService::class);
+        $pdfService->shouldReceive('generate')
+            ->once()
+            ->with(
+                'reports.observations-report-pdf',
+                Mockery::on(function (array $data) use ($filters): bool {
+                    return $data['filters'] === $filters
+                        && $data['total'] === 1
+                        && $data['groups']->pluck('sede')->all() === ['Sede Seleccionada']
+                        && $data['rows']->pluck('nombre_completo')->all() === ['Observación Incluida'];
+                }),
+                Mockery::type('string'),
+            )
+            ->andReturn([
+                'content' => '%PDF-1.7 filtered',
+                'filename' => 'reporte-observaciones-pqrsf-2026-01-31.pdf',
+            ]);
+        $this->app->instance(DetailedReportPdfService::class, $pdfService);
+
+        $response = $this->actingAs($admin)->get(route('admin.reportes.observaciones.pdf', $filters));
+
+        $response->assertOk();
+        $this->assertSame('%PDF-1.7 filtered', $response->getContent());
+    }
+
     public function test_observations_report_excludes_empty_observations_and_groups_by_sede(): void
     {
         $firstSede = Sede::factory()->create(['nombre' => 'Sede A']);
@@ -238,6 +287,8 @@ class AdditionalReportsTest extends TestCase
                 'date_to' => '2026-01-31',
             ])
             ->assertSee('Cliente de Pantalla')
+            ->assertSee('date_from=2026-01-01')
+            ->assertSee('date_to=2026-01-31')
             ->assertSee('Descargar XLSX');
     }
 
@@ -259,6 +310,30 @@ class AdditionalReportsTest extends TestCase
             ->call('generateReport');
 
         parse_str((string) parse_url($component->instance()->getDownloadUrl('pdf'), PHP_URL_QUERY), $query);
+
+        $this->assertSame([$sedes[0]->id, $sedes[1]->id], array_map('intval', $query['sede_id']));
+        $this->assertSame('2026-01-01', $query['date_from']);
+        $this->assertSame('2026-01-31', $query['date_to']);
+    }
+
+    public function test_observations_report_download_url_preserves_multiple_sedes_and_dates(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $sedes = Sede::factory()->createMany([
+            ['nombre' => 'Sede A'],
+            ['nombre' => 'Sede B'],
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(ObservationsReport::class)
+            ->fillForm([
+                'filterData.sede_id' => [$sedes[0]->id, $sedes[1]->id],
+                'filterData.date_from' => '2026-01-01',
+                'filterData.date_to' => '2026-01-31',
+            ])
+            ->call('generateReport');
+
+        parse_str((string) parse_url($component->instance()->getDownloadUrl('xlsx'), PHP_URL_QUERY), $query);
 
         $this->assertSame([$sedes[0]->id, $sedes[1]->id], array_map('intval', $query['sede_id']));
         $this->assertSame('2026-01-01', $query['date_from']);
@@ -297,10 +372,17 @@ class AdditionalReportsTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $sede = Sede::factory()->create(['nombre' => 'Sede XLSX']);
+        $otherSede = Sede::factory()->create(['nombre' => 'Otra Sede XLSX']);
 
         $this->createSubmission($sede, '2026-01-15 10:30:00', [
             'nombre_completo' => 'Cliente XLSX',
             'nombre_mesero' => 'Mesero XLSX',
+        ]);
+        $this->createSubmission($sede, '2026-02-15 10:30:00', [
+            'nombre_completo' => 'Cliente Fuera de Fecha',
+        ]);
+        $this->createSubmission($otherSede, '2026-01-15 10:30:00', [
+            'nombre_completo' => 'Cliente de Otra Sede',
         ]);
 
         $response = $this->actingAs($admin)->get(route('admin.reportes.registros.xlsx', [
@@ -317,6 +399,7 @@ class AdditionalReportsTest extends TestCase
         $rows = $this->readXlsx($response->getContent());
 
         $this->assertSame(['Fecha', 'Sede', 'Nombre Completo', 'Nombre de Mesero'], $rows[0]);
+        $this->assertCount(2, $rows);
         $this->assertSame('Cliente XLSX', $rows[1][2]);
         $this->assertSame('Mesero XLSX', $rows[1][3]);
     }

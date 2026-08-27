@@ -282,12 +282,16 @@ class Reports extends Page implements HasForms
 
     public function getDownloadUrl(string $format): string
     {
-        $params = array_filter(
-            $this->appliedFilters,
-            fn ($value) => $value !== null && $value !== '',
-        );
+        $filters = $this->reportData['filters'] ?? [];
 
-        return route("admin.reportes.{$format}", $params);
+        if (! is_array($filters) || $filters === []) {
+            $filters = $this->appliedFilters;
+        }
+
+        return route(
+            "admin.reportes.{$format}",
+            ReportFilters::queryParams($filters),
+        );
     }
 
     protected function getFormFilters(): array

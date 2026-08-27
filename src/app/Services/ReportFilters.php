@@ -48,6 +48,20 @@ final class ReportFilters
         ];
     }
 
+    public static function queryParams(array $filters): array
+    {
+        $params = [
+            ...self::normalize($filters),
+            'option_type' => $filters['option_type'] ?? null,
+            'rating_category' => $filters['rating_category'] ?? null,
+        ];
+
+        return array_filter(
+            $params,
+            fn ($value): bool => $value !== null && $value !== '',
+        );
+    }
+
     public static function normalizeDate(mixed $date): ?string
     {
         if (blank($date)) {

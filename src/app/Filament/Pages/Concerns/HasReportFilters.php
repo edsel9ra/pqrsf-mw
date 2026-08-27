@@ -51,12 +51,16 @@ trait HasReportFilters
 
     public function getDownloadUrl(string $format): string
     {
-        $params = array_filter(
-            $this->appliedFilters,
-            fn ($value) => $value !== null && $value !== '',
-        );
+        $filters = $this->reportData['filters'] ?? [];
 
-        return route($this->reportRouteName().'.'.$format, $params);
+        if (! is_array($filters) || $filters === []) {
+            $filters = $this->appliedFilters;
+        }
+
+        return route(
+            $this->reportRouteName().'.'.$format,
+            ReportFilters::queryParams($filters),
+        );
     }
 
     protected function validatedReportFilters(): ?array
