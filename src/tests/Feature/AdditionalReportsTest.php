@@ -289,6 +289,10 @@ class AdditionalReportsTest extends TestCase
             ->assertSee('Cliente de Pantalla')
             ->assertSee('date_from=2026-01-01')
             ->assertSee('date_to=2026-01-31')
+            ->assertSeeHtml('&amp;date_from=2026-01-01')
+            ->assertSeeHtml('&amp;date_to=2026-01-31')
+            ->assertDontSeeHtml('&amp;amp;date_from=2026-01-01')
+            ->assertDontSeeHtml('&amp;amp;date_to=2026-01-31')
             ->assertSee('Descargar XLSX');
     }
 
@@ -365,7 +369,11 @@ class AdditionalReportsTest extends TestCase
             ->assertSet('showReport', true)
             ->assertSee('Comentario de pantalla')
             ->assertDontSee('Cliente sin Comentario')
-            ->assertSee('Sede Observaciones');
+            ->assertSee('Sede Observaciones')
+            ->assertSeeHtml('&amp;date_from=2026-01-01')
+            ->assertSeeHtml('&amp;date_to=2026-01-31')
+            ->assertDontSeeHtml('&amp;amp;date_from=2026-01-01')
+            ->assertDontSeeHtml('&amp;amp;date_to=2026-01-31');
     }
 
     public function test_submission_xlsx_download_contains_filtered_columns(): void

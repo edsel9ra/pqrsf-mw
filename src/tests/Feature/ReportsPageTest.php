@@ -305,7 +305,11 @@ class ReportsPageTest extends TestCase
                 'filterData.rating_category' => 'tiempo',
             ])
             ->call('generateReport')
-            ->assertSet('appliedFilters', $filters);
+            ->assertSet('appliedFilters', $filters)
+            ->assertSeeHtml('&amp;date_from=2026-01-01')
+            ->assertSeeHtml('&amp;date_to=2026-01-31')
+            ->assertDontSeeHtml('&amp;amp;date_from=2026-01-01')
+            ->assertDontSeeHtml('&amp;amp;date_to=2026-01-31');
     }
 
     public function test_report_is_sent_only_to_active_recipients_of_the_selected_sede(): void

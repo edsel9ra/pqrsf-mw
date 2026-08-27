@@ -29,7 +29,7 @@
                     <div class="pqrs-report-actions">
                         <x-filament::button
                             tag="a"
-                            href="{{ $this->getDownloadUrl('pdf') }}"
+                            :href="$this->getDownloadUrl('pdf')"
                             icon="heroicon-o-document-arrow-down"
                             color="danger"
                             target="_blank"
@@ -39,7 +39,7 @@
                         </x-filament::button>
                         <x-filament::button
                             tag="a"
-                            href="{{ $this->getDownloadUrl('xlsx') }}"
+                            :href="$this->getDownloadUrl('xlsx')"
                             icon="heroicon-o-table-cells"
                             color="success"
                         >
