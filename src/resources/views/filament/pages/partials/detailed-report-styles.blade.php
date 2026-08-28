@@ -19,6 +19,10 @@
         box-sizing: border-box;
     }
 
+    .pqrs-report-page [x-cloak] {
+        display: none !important;
+    }
+
     .pqrs-report-page :is(.fi-fo-component-ctn, .fi-fo-field-wrp, .fi-input-wrp, .fi-select-input, .fi-input) {
         min-width: 0;
         max-width: 100%;
@@ -94,6 +98,38 @@
         display: grid;
         gap: 1.25rem;
         width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .pqrs-report-tabs {
+        display: grid;
+        gap: 0.85rem;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .pqrs-report-tabs-list {
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+        scrollbar-width: thin;
+    }
+
+    .pqrs-report-tabs-list .fi-tabs-item {
+        flex: 0 0 auto;
+        max-width: min(22rem, 78vw);
+    }
+
+    .pqrs-report-tabs-list .fi-tabs-item-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pqrs-report-tab-panel {
         min-width: 0;
         max-width: 100%;
     }

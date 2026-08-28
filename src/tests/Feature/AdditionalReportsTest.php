@@ -376,6 +376,47 @@ class AdditionalReportsTest extends TestCase
             ->assertDontSeeHtml('&amp;amp;date_to=2026-01-31');
     }
 
+    public function test_observations_report_renders_tabs_only_for_sedes_with_observations(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $firstSede = Sede::factory()->create(['nombre' => 'Sede Tab A']);
+        $secondSede = Sede::factory()->create(['nombre' => 'Sede Tab B']);
+        $emptySede = Sede::factory()->create(['nombre' => 'Sede Sin Observaciones']);
+
+        $this->createSubmission($firstSede, '2026-01-15 10:30:00', [
+            'nombre_completo' => 'Cliente de la pestaña A',
+            'observaciones' => 'Comentario de la sede A',
+        ]);
+        $this->createSubmission($secondSede, '2026-01-16 10:30:00', [
+            'nombre_completo' => 'Cliente de la pestaña B',
+            'observaciones' => 'Comentario de la sede B',
+        ]);
+        $this->createSubmission($emptySede, '2026-01-17 10:30:00', [
+            'nombre_completo' => 'Cliente sin observación',
+            'observaciones' => ' ',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ObservationsReport::class)
+            ->fillForm([
+                'filterData.date_from' => '2026-01-01',
+                'filterData.date_to' => '2026-01-31',
+            ])
+            ->call('generateReport')
+            ->assertSeeHtml('id="sede-'.$firstSede->id.'"')
+            ->assertSeeHtml('id="sede-'.$secondSede->id.'"')
+            ->assertSeeHtml('role="tabpanel"')
+            ->assertSeeHtml('aria-controls="sede-'.$firstSede->id.'-panel"')
+            ->assertSeeHtml('aria-controls="sede-'.$secondSede->id.'-panel"')
+            ->assertSee('Sede Tab A')
+            ->assertSee('Sede Tab B')
+            ->assertSee('Comentario de la sede A')
+            ->assertSee('Comentario de la sede B')
+            ->assertDontSeeHtml('id="sede-'.$emptySede->id.'"')
+            ->assertDontSeeHtml('aria-controls="sede-'.$emptySede->id.'-panel"')
+            ->assertDontSee('Cliente sin observación');
+    }
+
     public function test_submission_xlsx_download_contains_filtered_columns(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
