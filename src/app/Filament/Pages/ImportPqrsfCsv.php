@@ -39,6 +39,11 @@ class ImportPqrsfCsv extends Page implements HasForms
 
     public bool $readyToImport = false;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
+
     public function mount(): void
     {
         $this->form->fill([

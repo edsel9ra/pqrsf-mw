@@ -48,13 +48,23 @@ class ReportsPageTest extends TestCase
         $response->assertRedirect('/admin/login');
     }
 
-    public function test_pdf_download_requires_admin_role()
+    public function test_pdf_download_is_available_to_read_only_users(): void
     {
         $user = User::factory()->create(['role' => 'user']);
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldReceive('generate')
+            ->once()
+            ->andReturn([
+                'content' => '%PDF-1.7 read-only user',
+                'data' => [],
+                'filename' => 'reporte-pqrsf-test.pdf',
+            ]);
+        $this->app->instance(ReportPdfService::class, $pdfService);
 
         $response = $this->actingAs($user)->get('/admin/reportes/pdf');
 
-        $response->assertForbidden();
+        $response->assertOk();
+        $this->assertSame('%PDF-1.7 read-only user', $response->getContent());
     }
 
     /** @requires extension pdo_mysql */
@@ -93,6 +103,36 @@ class ReportsPageTest extends TestCase
         $response->assertHeader('Content-Type', 'application/pdf');
         $response->assertHeader('Content-Disposition', 'attachment; filename="reporte-pqrsf-2026-01-31.pdf"');
         $this->assertSame('%PDF-1.7 test', $response->getContent());
+    }
+
+    public function test_reports_page_loads_for_read_only_user(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+
+        $this->actingAs($user)
+            ->get('/admin/reports')
+            ->assertOk()
+            ->assertSee('Reportes');
+    }
+
+    public function test_read_only_user_cannot_send_a_report_by_email(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create(['role' => 'user']);
+        $pdfService = Mockery::mock(ReportPdfService::class);
+        $pdfService->shouldReceive('getData')
+            ->once()
+            ->andReturn($this->emptyReportData());
+        $this->app->instance(ReportPdfService::class, $pdfService);
+
+        Livewire::actingAs($user)
+            ->test(Reports::class)
+            ->call('generateReport')
+            ->assertDontSee('Enviar por correo')
+            ->call('sendReport')
+            ->assertStatus(403);
+
+        Mail::assertNothingSent();
     }
 
     public function test_pdf_download_accepts_multiple_sedes(): void

@@ -30,6 +30,11 @@ class SubmissionReport extends Page implements HasForms
 
     protected string $view = 'filament.pages.submission-report';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessReadOnlyPanel() ?? false;
+    }
+
     public function mount(): void
     {
         $this->form->fill();

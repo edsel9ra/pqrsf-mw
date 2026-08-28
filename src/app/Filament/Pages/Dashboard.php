@@ -19,6 +19,15 @@ class Dashboard extends BaseDashboard
 {
     use HasFiltersForm;
 
+    protected static ?string $navigationLabel = 'Escritorio';
+
+    protected static ?string $title = 'Escritorio';
+
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessReadOnlyPanel() ?? false;
+    }
+
     public function getWidgets(): array
     {
         return [

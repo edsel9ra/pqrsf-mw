@@ -18,9 +18,19 @@ class User extends Authenticatable implements FilamentUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    public function canAccessPanel(Panel $panel): bool
+    public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public function canAccessReadOnlyPanel(): bool
+    {
+        return in_array($this->role, ['admin', 'user'], true);
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->canAccessReadOnlyPanel();
     }
 
     protected function casts(): array

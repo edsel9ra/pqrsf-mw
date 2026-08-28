@@ -30,6 +30,11 @@ class ObservationsReport extends Page implements HasForms
 
     protected string $view = 'filament.pages.observations-report';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessReadOnlyPanel() ?? false;
+    }
+
     public function mount(): void
     {
         $this->form->fill();

@@ -552,9 +552,11 @@
                         <x-filament::button tag="a" :href="$this->getDownloadUrl('pdf')" icon="heroicon-o-document-arrow-down" color="danger" target="_blank">
                             Descargar PDF
                         </x-filament::button>
-                        <x-filament::button type="button" wire:click="sendReport" wire:confirm="¿Enviar este reporte a los destinatarios activos de las sedes seleccionadas?" icon="heroicon-o-envelope" color="success">
-                            Enviar por correo
-                        </x-filament::button>
+                        @if (auth()->user()?->isAdmin())
+                            <x-filament::button type="button" wire:click="sendReport" wire:confirm="¿Enviar este reporte a los destinatarios activos de las sedes seleccionadas?" icon="heroicon-o-envelope" color="success">
+                                Enviar por correo
+                            </x-filament::button>
+                        @endif
                     </div>
                 </div>
 

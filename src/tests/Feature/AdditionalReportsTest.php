@@ -28,17 +28,64 @@ class AdditionalReportsTest extends TestCase
         $this->get('/admin/observations-report')->assertRedirect('/admin/login');
     }
 
-    public function test_new_report_downloads_require_admin_role(): void
+    public function test_new_report_downloads_are_available_to_read_only_users(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+
+        $submissionService = Mockery::mock(SubmissionReportService::class);
+        $submissionService->shouldReceive('getData')
+            ->once()
+            ->andReturn(['rows' => collect()]);
+        $this->app->instance(SubmissionReportService::class, $submissionService);
+
+        $observationsService = Mockery::mock(ObservationsReportService::class);
+        $observationsService->shouldReceive('getData')
+            ->once()
+            ->andReturn(['groups' => collect()]);
+        $this->app->instance(ObservationsReportService::class, $observationsService);
+
+        $pdfService = Mockery::mock(DetailedReportPdfService::class);
+        $pdfService->shouldReceive('generate')
+            ->once()
+            ->andReturn([
+                'content' => '%PDF-1.7 read-only user',
+                'filename' => 'reporte-test.pdf',
+            ]);
+        $this->app->instance(DetailedReportPdfService::class, $pdfService);
+
+        $xlsxService = Mockery::mock(ReportXlsxService::class);
+        $xlsxService->shouldReceive('generate')
+            ->once()
+            ->andReturn([
+                'content' => 'xlsx-read-only-user',
+                'filename' => 'reporte-test.xlsx',
+            ]);
+        $this->app->instance(ReportXlsxService::class, $xlsxService);
+
+        $this->actingAs($user)
+            ->get(route('admin.reportes.registros.xlsx'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $this->actingAs($user)
+            ->get(route('admin.reportes.observaciones.pdf'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+    }
+
+    public function test_new_report_pages_load_for_read_only_users(): void
     {
         $user = User::factory()->create(['role' => 'user']);
 
         $this->actingAs($user)
-            ->get(route('admin.reportes.registros.xlsx'))
-            ->assertForbidden();
+            ->get('/admin/submission-report')
+            ->assertOk()
+            ->assertSee('Reporte de registros PQRSF');
 
         $this->actingAs($user)
-            ->get(route('admin.reportes.observaciones.pdf'))
-            ->assertForbidden();
+            ->get('/admin/observations-report')
+            ->assertOk()
+            ->assertSee('Reporte de observaciones por sede');
     }
 
     public function test_submission_report_uses_created_at_and_applies_filters(): void

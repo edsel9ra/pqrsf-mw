@@ -47,6 +47,11 @@ class Reports extends Page implements HasForms
 
     public bool $showReport = false;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessReadOnlyPanel() ?? false;
+    }
+
     public function mount(): void
     {
         $this->form->fill();
@@ -118,6 +123,8 @@ class Reports extends Page implements HasForms
 
     public function sendReport(): void
     {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+
         if (! $this->showReport || $this->appliedFilters === []) {
             Notification::make()
                 ->title('Genere el reporte antes de enviarlo')

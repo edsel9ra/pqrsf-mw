@@ -36,7 +36,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogo(asset('logo_mw.png'))
             ->darkModeBrandLogo(asset('logo_mw.png'))
             ->brandLogoHeight('3.5rem')
-            ->favicon(asset('logo_mw.png'))
+            ->favicon(asset('logo_favicon.png'))
             ->colors([
                 'primary' => Color::Amber,
             ])

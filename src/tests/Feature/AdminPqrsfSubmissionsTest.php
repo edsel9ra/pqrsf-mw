@@ -27,6 +27,34 @@ class AdminPqrsfSubmissionsTest extends TestCase
         $response->assertSee('PQRSF');
     }
 
+    public function test_read_only_user_can_view_submissions_but_cannot_use_mutating_actions(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $pending = $this->makeSubmission(['status' => 'pending']);
+        $validated = $this->makeSubmission(['status' => 'validated']);
+
+        $response = $this->actingAs($user)->get('/admin/pqrsf-submissions');
+
+        $response->assertOk();
+
+        Livewire::actingAs($user)
+            ->test(ListPqrsfSubmissions::class)
+            ->assertCanSeeTableRecords([$pending, $validated])
+            ->assertTableActionVisible('view', $pending)
+            ->assertTableActionHidden('validate', $pending)
+            ->assertTableActionHidden('send', $validated);
+    }
+
+    public function test_read_only_user_cannot_open_submission_edit_page(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $submission = $this->makeSubmission();
+
+        $this->actingAs($user)
+            ->get("/admin/pqrsf-submissions/{$submission->id}/edit")
+            ->assertForbidden();
+    }
+
     public function test_pending_submission_option_can_be_changed_from_detail_action(): void
     {
         $user = User::factory()->create(['role' => 'admin']);

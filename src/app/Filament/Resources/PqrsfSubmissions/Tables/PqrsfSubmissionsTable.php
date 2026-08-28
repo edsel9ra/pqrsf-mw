@@ -17,6 +17,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Throwable;
@@ -106,10 +107,12 @@ class PqrsfSubmissionsTable
                     ->modalDescription(fn ($record): string => 'Registrada el '.$record->created_at->format('d/m/Y H:i').' en '.($record->sede?->nombre ?? 'sede no disponible'))
                     ->modalWidth(Width::SixExtraLarge)
                     ->modalCancelActionLabel('Cerrar')
-                    ->extraModalFooterActions(fn (): array => [
-                        static::changeOptionAction(),
-                        static::changeRatingsAction(),
-                    ])
+                    ->extraModalFooterActions(fn (): array => auth()->user()?->isAdmin()
+                        ? [
+                            static::changeOptionAction(),
+                            static::changeRatingsAction(),
+                        ]
+                        : [])
                     ->schema(fn ($record): array => [
                         View::make('filament.pqrsf-submissions.view-modal')
                             ->viewData(static::getViewData($record)),
@@ -118,9 +121,11 @@ class PqrsfSubmissionsTable
                     ->label('Validar')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn ($record) => $record->status === 'pending')
+                    ->visible(fn ($record): bool => $record->status === 'pending' && (auth()->user()?->isAdmin() ?? false))
                     ->requiresConfirmation()
                     ->action(function ($record) {
+                        Gate::authorize('update', $record);
+
                         $record->update(['status' => 'validated']);
 
                         SubmissionLog::create([
@@ -136,9 +141,11 @@ class PqrsfSubmissionsTable
                     ->label('Enviar a destinatarios')
                     ->icon('heroicon-o-envelope')
                     ->color('primary')
-                    ->visible(fn ($record) => $record->status === 'validated')
+                    ->visible(fn ($record): bool => $record->status === 'validated' && (auth()->user()?->isAdmin() ?? false))
                     ->requiresConfirmation()
                     ->action(function ($record) {
+                        Gate::authorize('update', $record);
+
                         $recipients = $record->sede->sedeRecipients()->where('activo', true)->get();
 
                         if ($recipients->isEmpty()) {
@@ -209,7 +216,7 @@ class PqrsfSubmissionsTable
             ->label('Cambiar opción')
             ->icon('heroicon-o-pencil-square')
             ->color('warning')
-            ->visible(fn ($record): bool => $record->status === 'pending')
+            ->visible(fn ($record): bool => $record->status === 'pending' && (auth()->user()?->isAdmin() ?? false))
             ->modalHeading(fn ($record): string => "Cambiar opción PQRSF #{$record->id}")
             ->modalDescription('Solo se puede reclasificar una PQRSF mientras está pendiente de validación.')
             ->modalWidth(Width::Medium)
@@ -225,6 +232,8 @@ class PqrsfSubmissionsTable
                     ->native(false),
             ])
             ->action(function ($record, array $data): void {
+                Gate::authorize('update', $record);
+
                 if ($record->status !== 'pending') {
                     Notification::make()
                         ->title('No se puede cambiar la opción')
@@ -271,7 +280,7 @@ class PqrsfSubmissionsTable
             ->label('Cambiar calificaciones')
             ->icon('heroicon-o-star')
             ->color('warning')
-            ->visible(fn ($record): bool => $record->status === 'pending')
+            ->visible(fn ($record): bool => $record->status === 'pending' && (auth()->user()?->isAdmin() ?? false))
             ->modalHeading(fn ($record): string => "Cambiar calificaciones PQRSF #{$record->id}")
             ->modalDescription('Solo se pueden cambiar las calificaciones mientras la PQRSF está pendiente de validación.')
             ->modalWidth(Width::Medium)
@@ -305,6 +314,8 @@ class PqrsfSubmissionsTable
                     ->native(false),
             ])
             ->action(function ($record, array $data): void {
+                Gate::authorize('update', $record);
+
                 if ($record->status !== 'pending') {
                     Notification::make()
                         ->title('No se pueden cambiar las calificaciones')
