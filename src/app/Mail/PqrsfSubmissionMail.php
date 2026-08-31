@@ -13,11 +13,17 @@ class PqrsfSubmissionMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public PqrsfSubmission $submission;
-
-    public function __construct(PqrsfSubmission $submission)
-    {
-        $this->submission = $submission;
+    public function __construct(
+        public PqrsfSubmission $submission,
+        public array $excludedFieldKeys = [],
+        public bool $includePdf = true,
+    ) {
+        $this->excludedFieldKeys = collect($excludedFieldKeys)
+            ->filter(fn (mixed $key): bool => is_string($key) && $key !== '')
+            ->unique()
+            ->values()
+            ->all();
+        $this->includePdf = $includePdf && $this->excludedFieldKeys === [];
     }
 
     public function envelope(): Envelope
@@ -31,6 +37,11 @@ class PqrsfSubmissionMail extends Mailable
     {
         return new Content(
             markdown: 'emails.pqrsf-submission',
+            with: [
+                'submission' => $this->submission,
+                'excludedFieldKeys' => $this->excludedFieldKeys,
+                'includePdf' => $this->includePdf,
+            ],
         );
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Mail\PqrsfSubmissionMail;
+use App\Models\ComplaintRecipientProfile;
 use App\Models\PqrsfSubmission;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -29,10 +30,29 @@ class PqrsfComplaintNotificationService
             return;
         }
 
+        $recipientEmails = $recipients->pluck('email')
+            ->map(fn (string $email): ?string => ComplaintRecipientProfile::normalizeEmail($email))
+            ->filter()
+            ->unique()
+            ->values();
+        $profiles = $recipientEmails->isEmpty()
+            ? collect()
+            : ComplaintRecipientProfile::query()
+                ->whereIn('email', $recipientEmails->all())
+                ->get()
+                ->keyBy('email');
+
         foreach ($recipients as $recipient) {
             try {
+                $profile = $profiles->get(ComplaintRecipientProfile::normalizeEmail($recipient->email));
+                $excludedFieldKeys = $profile?->effectiveExcludedFieldKeys() ?? [];
+
                 Mail::to($recipient->email, $recipient->nombre)
-                    ->send(new PqrsfSubmissionMail($submission));
+                    ->send(new PqrsfSubmissionMail(
+                        $submission,
+                        $excludedFieldKeys,
+                        $excludedFieldKeys === [],
+                    ));
             } catch (Throwable $exception) {
                 report($exception);
 

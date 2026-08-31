@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\PqrsfSubmissionMail;
+use App\Models\ComplaintRecipientProfile;
 use App\Models\FormField;
 use App\Models\PqrsfSubmission;
 use App\Models\Sede;
@@ -138,10 +139,22 @@ class PqrsfSubmissionTest extends TestCase
         $response->assertRedirect('/pqrsf/gracias');
         Mail::assertSent(PqrsfSubmissionMail::class, 2);
         Mail::assertSent(PqrsfSubmissionMail::class, function (PqrsfSubmissionMail $mail): bool {
-            return $mail->hasTo('director.franquicias@misterwings.com');
+            return $mail->hasTo('director.franquicias@misterwings.com')
+                && $mail->includePdf
+                && str_contains($mail->render(), '3001234567')
+                && str_contains($mail->render(), 'juan@example.com');
         });
         Mail::assertSent(PqrsfSubmissionMail::class, function (PqrsfSubmissionMail $mail): bool {
-            return $mail->hasTo('director.administrativosedes@misterwings.com');
+            $html = $mail->render();
+
+            return $mail->hasTo('director.administrativosedes@misterwings.com')
+                && $mail->excludedFieldKeys === ComplaintRecipientProfile::withoutContactDataFieldKeys()
+                && ! $mail->includePdf
+                && ! str_contains($html, '3001234567')
+                && ! str_contains($html, 'juan@example.com')
+                && ! str_contains($html, 'Número móvil')
+                && ! str_contains($html, 'Correo electrónico')
+                && ! str_contains($html, 'Abrir PDF');
         });
         Mail::assertNotSent(PqrsfSubmissionMail::class, function (PqrsfSubmissionMail $mail): bool {
             return $mail->hasTo('recipient-from-other-flow@example.com')

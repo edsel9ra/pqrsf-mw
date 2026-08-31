@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\ComplaintRecipientProfile;
 use App\Models\FormField;
 use App\Models\PqrsfSubmission;
 use App\Models\Sede;
@@ -37,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
 
         foreach ([
             FormField::class,
+            ComplaintRecipientProfile::class,
             Sede::class,
             SedeComplaintRecipient::class,
             SedeRecipient::class,

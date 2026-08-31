@@ -1,5 +1,7 @@
 @php
     $values = $submission->field_values ?? [];
+    $excludedFieldKeys = $excludedFieldKeys ?? [];
+    $showField = fn (string $key): bool => ! in_array($key, $excludedFieldKeys, true);
     $option = $values['opcion_a_calificar'] ?? 'Sin clasificar';
     $optionColors = match ($option) {
         'Queja' => ['background' => '#fee2e2', 'border' => '#fecaca', 'text' => '#991b1b'],
@@ -10,12 +12,17 @@
         default => ['background' => '#f8fafc', 'border' => '#e2e8f0', 'text' => '#334155'],
     };
     $ratings = [
-        'Ambientación' => $values['calificacion_ambientacion'] ?? null,
-        'Atención' => $values['calificacion_atencion'] ?? null,
-        'Comida' => $values['calificacion_comida'] ?? null,
-        'Tiempo' => $values['calificacion_tiempo'] ?? null,
+        'calificacion_ambientacion' => ['label' => 'Ambientación', 'value' => $values['calificacion_ambientacion'] ?? null],
+        'calificacion_atencion' => ['label' => 'Atención', 'value' => $values['calificacion_atencion'] ?? null],
+        'calificacion_comida' => ['label' => 'Comida', 'value' => $values['calificacion_comida'] ?? null],
+        'calificacion_tiempo' => ['label' => 'Tiempo', 'value' => $values['calificacion_tiempo'] ?? null],
     ];
-    $numericRatings = collect($ratings)->filter(fn ($rating): bool => is_numeric($rating));
+    $visibleRatings = collect($ratings)
+        ->filter(fn (array $rating, string $key): bool => $showField($key));
+    $hasHiddenRating = $visibleRatings->count() !== count($ratings);
+    $numericRatings = $visibleRatings
+        ->pluck('value')
+        ->filter(fn (mixed $rating): bool => is_numeric($rating));
     $average = $numericRatings->isEmpty()
         ? '—'
         : number_format($numericRatings->avg(), 1, ',', '.');
@@ -46,7 +53,7 @@
 <tr>
 <td style="padding: 0; vertical-align: top;">
 <div style="margin: 0 0 12px; color: #f6b84b; font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;">Nuevo expediente PQRSF</div>
-<h1 style="margin: 0; color: #ffffff; font-size: 30px; font-weight: 900; line-height: 1.05; letter-spacing: -0.04em;">Solicitud #{{ $submission->id }}</h1>
+<h1 style="margin: 0; color: #ffffff; font-size: 30px; font-weight: 900; line-height: 1.05; letter-spacing: -0.04em;">ID #{{ $submission->id }}</h1>
 </td>
 @if ($logoSrc)
 <td align="right" style="padding: 0 0 0 18px; vertical-align: top; width: 120px;">
@@ -95,7 +102,7 @@
 <tr>
 <td style="padding: 0 0 16px;">
 <div style="color: #9a6a21; font-size: 11px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase;">Resumen</div>
-<h2 style="margin: 7px 0 0; color: #1f1714; font-size: 20px; font-weight: 900; line-height: 1.2;">{{ $values['nombre_completo'] ?? 'Cliente sin nombre' }}</h2>
+<h2 style="margin: 7px 0 0; color: #1f1714; font-size: 20px; font-weight: 900; line-height: 1.2;">{{ $showField('nombre_completo') ? ($values['nombre_completo'] ?? 'Cliente sin nombre') : 'Cliente' }}</h2>
 </td>
 <td align="right" style="padding: 0 0 16px;">
 <span style="display: inline-block; padding: 7px 12px; border: 1px solid {{ $optionColors['border'] }}; border-radius: 999px; background: {{ $optionColors['background'] }}; color: {{ $optionColors['text'] }}; font-size: 12px; font-weight: 800;">{{ $option }}</span>
@@ -104,31 +111,42 @@
 </table>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+@if ($showField('numero_movil'))
 <tr>
 <td style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #7c6f64; font-size: 13px; font-weight: 700;">Número móvil</td>
 <td align="right" style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #221714; font-size: 14px; font-weight: 750;">{{ $values['numero_movil'] ?? '—' }}</td>
 </tr>
+@endif
+@if ($showField('correo_electronico'))
 <tr>
 <td style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #7c6f64; font-size: 13px; font-weight: 700;">Correo electrónico</td>
 <td align="right" style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #221714; font-size: 14px; font-weight: 750;">{{ $values['correo_electronico'] ?? '—' }}</td>
 </tr>
+@endif
+@if ($showField('nombre_mesero'))
 <tr>
 <td style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #7c6f64; font-size: 13px; font-weight: 700;">Mesero</td>
 <td align="right" style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #221714; font-size: 14px; font-weight: 750;">{{ $values['nombre_mesero'] ?? '—' }}</td>
 </tr>
+@endif
+@if ($showField('recomendaria'))
 <tr>
 <td style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #7c6f64; font-size: 13px; font-weight: 700;">¿Recomendaría?</td>
 <td align="right" style="padding: 12px 0; border-top: 1px solid #f0e6d8; color: #221714; font-size: 14px; font-weight: 750;">{{ $recommendation }}</td>
 </tr>
+@endif
+@if ($showField('medio_conocimiento'))
 <tr>
 <td style="padding: 12px 0 0; border-top: 1px solid #f0e6d8; color: #7c6f64; font-size: 13px; font-weight: 700;">Medio de conocimiento</td>
 <td align="right" style="padding: 12px 0 0; border-top: 1px solid #f0e6d8; color: #221714; font-size: 14px; font-weight: 750;">{{ $medium ?: '—' }}</td>
 </tr>
+@endif
 </table>
 </td>
 </tr>
 </table>
 
+@if ($visibleRatings->isNotEmpty())
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 0 0 22px;">
 <tr>
 <td style="padding: 0;">
@@ -136,24 +154,28 @@
 </td>
 </tr>
 <tr>
-@foreach ($ratings as $label => $rating)
+@foreach ($visibleRatings as $rating)
 <td width="25%" style="padding: 0 {{ $loop->last ? '0' : '6px' }} 0 {{ $loop->first ? '0' : '6px' }};">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; border-radius: 15px; background: #17120f;">
 <tr>
 <td style="padding: 16px 12px; text-align: center;">
-<div style="color: #f4b24e; font-size: 25px; font-weight: 900; line-height: 1;">{{ is_numeric($rating) ? $rating : '—' }}</div>
-<div style="margin-top: 7px; color: #f5e7d0; font-size: 11px; font-weight: 750; line-height: 1.25;">{{ $label }}</div>
+<div style="color: #f4b24e; font-size: 25px; font-weight: 900; line-height: 1;">{{ is_numeric($rating['value']) ? $rating['value'] : '—' }}</div>
+<div style="margin-top: 7px; color: #f5e7d0; font-size: 11px; font-weight: 750; line-height: 1.25;">{{ $rating['label'] }}</div>
 </td>
 </tr>
 </table>
 </td>
 @endforeach
 </tr>
+@if (! $hasHiddenRating)
 <tr>
 <td colspan="4" style="padding: 14px 0 0; color: #6f6258; font-size: 13px; line-height: 1.55;">Promedio general: <strong style="color: #1f1714;">{{ $average }}/5</strong></td>
 </tr>
+@endif
 </table>
+@endif
 
+@if ($showField('observaciones'))
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 0 0 24px; border-radius: 18px; background: #f6efe5; border: 1px solid #eadfce;">
 <tr>
 <td style="padding: 22px 24px;">
@@ -162,3 +184,4 @@
 </td>
 </tr>
 </table>
+@endif

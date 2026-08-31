@@ -58,7 +58,7 @@
                         <article class="pqrs-report-stat total">
                             <span class="pqrs-report-stat-label">Total de registros</span>
                             <strong class="pqrs-report-stat-value">{{ $reportData['total'] }}</strong>
-                            <span class="pqrs-report-stat-note">Solicitudes del periodo</span>
+                            <span class="pqrs-report-stat-note">Encuestas del periodo</span>
                         </article>
                     </div>
 

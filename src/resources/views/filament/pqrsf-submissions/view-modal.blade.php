@@ -404,7 +404,7 @@
     <section class="pqrs-submission-hero" aria-label="Resumen de la PQRSF">
         <div>
             <p class="pqrs-submission-eyebrow">Expediente PQRSF</p>
-            <h3 class="pqrs-submission-title">Solicitud #{{ $summary['id'] ?? '—' }}</h3>
+            <h3 class="pqrs-submission-title">ID #{{ $summary['id'] ?? '—' }}</h3>
             <p class="pqrs-submission-subtitle">
                 Registro recibido en {{ $summary['sede'] ?? '—' }} el {{ $summary['createdAt'] ?? '—' }}.
             </p>

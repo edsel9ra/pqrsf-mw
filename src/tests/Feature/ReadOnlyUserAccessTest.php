@@ -7,6 +7,7 @@ use App\Filament\Pages\ImportPqrsfCsv;
 use App\Filament\Pages\ObservationsReport;
 use App\Filament\Pages\Reports;
 use App\Filament\Pages\SubmissionReport;
+use App\Models\ComplaintRecipientProfile;
 use App\Models\FormField;
 use App\Models\Sede;
 use App\Models\SedeComplaintRecipient;
@@ -51,6 +52,7 @@ class ReadOnlyUserAccessTest extends TestCase
 
         foreach ([
             FormField::class,
+            ComplaintRecipientProfile::class,
             Sede::class,
             SedeComplaintRecipient::class,
             SedeRecipient::class,
@@ -61,6 +63,7 @@ class ReadOnlyUserAccessTest extends TestCase
 
         foreach ([
             '/admin/form-fields',
+            '/admin/complaint-recipient-profiles',
             '/admin/import-pqrsf-csv',
             '/admin/sede-complaint-recipients',
             '/admin/sede-recipients',
