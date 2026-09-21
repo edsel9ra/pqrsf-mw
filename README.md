@@ -39,6 +39,34 @@ Usuario admin seed:
 admin@pqrsf.com / admin123
 ```
 
+## Crear Usuarios Sin Acceso De Un Administrador
+
+Si no hay un administrador disponible para entrar al panel, no es necesario abrir phpMyAdmin ni modificar la tabla `users` manualmente. El proyecto incluye el comando Artisan `pqrsf:create-admin`, que crea o recupera un administrador usando la aplicación.
+
+Desde la raíz del repositorio, asegúrate de que los servicios estén iniciados:
+
+```bash
+docker compose up -d --build
+```
+
+Después ejecuta el comando con el correo, nombre y contraseña que tendrá el administrador de recuperación:
+
+```bash
+docker compose exec app php artisan pqrsf:create-admin admin-recuperacion@ejemplo.com --name="Administrador de recuperación" --password="CambiarEstaClave123"
+```
+
+El comando exige una contraseña de al menos 8 caracteres y:
+
+- crea el usuario si el correo no existe;
+- actualiza el nombre, la contraseña y el rol si el correo ya existe;
+- asigna el rol `admin` y marca el correo como verificado.
+
+Si el correo ya pertenece a otra persona, el comando reemplazará su contraseña y lo convertirá en administrador. Utiliza únicamente un correo autorizado para la recuperación y una contraseña temporal segura. No guardes la contraseña real en este README, en commits ni en tickets.
+
+Cuando termine, inicia sesión en `http://localhost:8080/admin` con las credenciales indicadas. Luego puedes crear los usuarios normales desde **Configuración → Usuarios → Crear usuario**, seleccionando el rol `Usuario de consulta` o `Administrador`.
+
+No uses `migrate:fresh --seed` para recuperar el acceso en un entorno con datos reales, porque elimina y recrea todas las tablas.
+
 ## Comandos Frecuentes
 
 Todos los comandos de Laravel se ejecutan dentro del contenedor `app`:
